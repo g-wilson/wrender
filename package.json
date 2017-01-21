@@ -14,13 +14,17 @@
     "cdn",
     "compression",
     "jpeg",
-    "resizer",
+    "resize",
     "imgix",
     "crop",
     "sharp",
-    "vips"
+    "libvips"
   ],
-  "author": "George Wilson",
+  "author": "George Wilson <george@g-wilson.co.uk>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/g-wilson/wrender.git"
+  },
   "license": "MIT",
   "dependencies": {
     "express": "^4.14.0",
