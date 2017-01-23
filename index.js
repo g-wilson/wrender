@@ -3,20 +3,14 @@ const express = require('express');
 const temp = require('temp').track();
 const readChunk = require('read-chunk');
 const imageType = require('image-type');
-const request = require('request');
 const sharp = require('sharp');
 const micromatch = require('micromatch');
 
 const blank = new Buffer('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', 'base64');
-
-const createError = (status, msg) => {
-  const err = new Error(msg);
-  err.status = status;
-  return err;
-};
+const configureRequests = require('./lib/request');
+const errors = require('./lib/errors');
 
 module.exports = function (config) {
-  config = config || {};
   config = Object.assign({
     quality: 85,
     convertGIF: true,
@@ -28,8 +22,9 @@ module.exports = function (config) {
     timeout: 10000,
     hostWhitelist: [],
     hostBlacklist: [],
-  }, config);
+  }, config || {});
 
+  const request = configureRequests(config);
   const router = express.Router();
 
   /**
@@ -40,7 +35,7 @@ module.exports = function (config) {
     stream.on('error', next);
     stream.on('finish', () => {
       const type = imageType(readChunk.sync(stream.path, 0, 12)); // First 12 bytes contains the mime type header
-      if (!type) return next(createError(400, `Source file is not an image: ${req.originalUrl}`));
+      if (!type) return next(errors.ArgumentError('INVALID_IMG', `Source file is not an image: ${req.originalUrl}`));
 
       req.wrender = {};
       req.wrender.mimetype = type.mime;
@@ -76,17 +71,9 @@ module.exports = function (config) {
       next();
     });
 
-    const r = request({
-      url: `http://${req.params.source}`,
-      timeout: config.timeout
-    });
-    r.on('response', response => {
-      if (res.statusCode !== 200 && res.statusCode !== 304) {
-        return stream.emit('error', createError(400, `${response.statusCode} response from ${req.params.source}`));
-      }
-      r.pipe(stream);
-    });
-    r.on('error', error => stream.emit('error', error));
+    request(req.params.source)
+      .then(r => r.pipe(stream))
+      .catch(err => stream.emit('error', err));
   };
 
   /**
@@ -94,16 +81,16 @@ module.exports = function (config) {
    */
   router.use((req,res, next) => {
     if (config.userAgent && req.headers['user-agent'] !== config.userAgent) {
-      return next(createError(403, 'User Agent forbidden'));
+      return next(errors.AccessForbidden('USER_AGENT_FORBIDDEN', 'Invalid user agent'));
     }
+
     if (req.params.width > config.maxWidth || req.params.height > config.maxHeight) {
-      return next(createError(400, 'Requested image too large'));
+      return next(errors.ArgumentError('IMG_TOO_LARGE', 'Requested image is too large'));
     }
-    if (config.hostWhitelist.length && !micromatch.any(req.params.source, config.hostWhitelist)) {
-      return next(createError(400, 'Invalid remote url'));
-    }
-    if (config.hostBlacklist.length && micromatch.any(req.params.source, config.hostBlacklist)) {
-      return next(createError(400, 'Invalid remote url'));
+
+    // isBlacklisted looks at the whitelist, then the blacklist, and makes a decision
+    if (request.isBlacklisted(`http://${req.params.source}`)) {
+      return next(errors.ArgumentError('INVALID_REMOTE_URL', `${req.params.source} is not a valid remote URL`));
     }
 
     next();
@@ -139,7 +126,7 @@ module.exports = function (config) {
    * Response handler
    */
   router.use((req, res, next) => {
-    if (!req.wrender) return next(createError(404));
+    if (!req.wrender) return next(errors.NotFoundError(null, 'Wrender not found'));
 
     res.setHeader('Content-Type', req.wrender.mimetype);
     res.setHeader('Cache-Control', `public, max-age=${config.maxAge}`);
