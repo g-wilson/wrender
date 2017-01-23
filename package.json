@@ -21,6 +21,9 @@
     "libvips"
   ],
   "author": "George Wilson <george@g-wilson.co.uk>",
+  "files": [
+    "index.js", "lib"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/g-wilson/wrender.git"
