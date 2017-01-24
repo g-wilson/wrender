@@ -121,6 +121,16 @@ s
 
 Expand the functionality of the image processing recipes. A list of Sharp's transformation methods can be found [here](http://sharp.dimens.io/en/stable/api-operation/).
 
+**Extensibility**
+
+Add the ability to add custom recipe routes before mounting wrender to the express app.
+
+Add the ability to add aliases for the source image path. e.g. `/profile_pics/me.jpg` becomes `/static.mysite.com/webapp/uploads/profilepics/120/compressed/me.jpg`
+
+**Request**
+
+Handle more complicated request flow when fetching the source image. For example, request will follow redirects by default, but if it redirects to a blacklisted domain, wrender does not stop this happening.
+
 **Tests**
 
 The initial version is quite messy, everything is one file. I'd like to refactor it so that unit tests can be written for each stage of the process, and also have some end-to-end tests to check things like the response headers.
