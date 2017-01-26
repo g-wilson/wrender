@@ -165,7 +165,8 @@ module.exports = function (config) {
   /**
    * Error handler
    */
-  router.use((error, req, res) => {
+  // eslint-disable-next-line no-unused-vars
+  router.use((error, req, res, next) => {
     if (req.wrender && req.wrender.source) {
       fs.unlink(req.wrender.source.path);
     }
