@@ -55,6 +55,31 @@ const options = {
   hostBlacklist: [
     'hack.thepla.net',
   ],
+
+  // Optionally you can hide the source from your URLs by rewriting them on the fly
+  rewrite: {
+    // Either by directly replacing the hostname
+    blog_uploads: 'my-company-content.s3.amazonaws.com/uploads/blog',
+    // => http://localhost:3010/proxy/blog_uploads/57b7e6f33083dcc19380597da6b17a2f.jpg
+    // => http://localhost:3010/proxy/my-company-content.s3.amazonaws.com/uploads/blog/57b7e6f33083dcc19380597da6b17a2f.jpg
+
+    // Or using regex to actually rewrite the URL
+    user_uploads: {
+      'profile/(.+)': 'my-company-content.s3.amazonaws.com/uploads/user/profile/$1',
+      // => http://localhost:3010/proxy/user_uploads/profile/57b7e6f33083dcc19380597da6b17a2f.jpg
+      // => http://localhost:3010/proxy/my-company-content.s3.amazonaws.com/uploads/user/profile/57b7e6f33083dcc19380597da6b17a2f.jpg
+
+      'cover/(.+)': 'my-company-content.s3.amazonaws.com/uploads/user/cover/$1',
+      // => http://localhost:3010/proxy/user_uploads/cover/57b7e6f33083dcc19380597da6b17a2f.jpg
+      // => http://localhost:3010/proxy/my-company-content.s3.amazonaws.com/uploads/user/cover/57b7e6f33083dcc19380597da6b17a2f.jpg
+    },
+
+    facebook_profile_pic: {
+      '(\\d+).jpg': 'graph.facebook.com/$1/picture',
+      // => http://localhost:3010/proxy/facebook_profile_pic/113741208636938.jpg
+      // => http://localhost:3010/proxy/graph.facebook.com/113741208636938/picture
+    },
+  }
 };
 
 // As part of your Express appp
@@ -124,8 +149,6 @@ Expand the functionality of the image processing recipes. A list of Sharp's tran
 **Extensibility**
 
 Add the ability to add custom recipe routes before mounting wrender to the express app.
-
-Add the ability to add aliases for the source image path. e.g. `/profile_pics/me.jpg` becomes `/static.mysite.com/webapp/uploads/profilepics/120/compressed/me.jpg`
 
 **Request**
 
