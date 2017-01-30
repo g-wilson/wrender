@@ -32,30 +32,30 @@ module.exports = function (config) {
   /**
    * Validation
    */
-  middleware.push(function (req, res, next) {
+  middleware.push((req, res, next) => {
     if (config.userAgent && req.headers['user-agent'] !== config.userAgent) {
-      return next(createError(403, 'User Agent forbidden'));
+      return next(errors(403, 'User Agent forbidden'));
     }
     if (req.params.width > config.maxWidth || req.params.height > config.maxHeight) {
-      return next(createError(400, 'Requested image too large'));
+      return next(errors(400, 'Requested image too large'));
     }
     if (config.hostWhitelist.length && !micromatch.any(req.params.source, config.hostWhitelist)) {
-      return next(createError(400, 'Invalid remote url'));
+      return next(errors(400, 'Invalid remote url'));
     }
     if (config.hostBlacklist.length && micromatch.any(req.params.source, config.hostBlacklist)) {
-      return next(createError(400, 'Invalid remote url'));
+      return next(errors(400, 'Invalid remote url'));
     }
 
     if (typeof config.rewrite === 'object') {
-      var parsed = url.parse(`http://${req.params.source}`);
+      const parsed = url.parse(`http://${req.params.source}`);
 
       if (typeof config.rewrite[parsed.hostname] === 'string') {
         // 'facebook_profile_pic': 'graph.facebook.com'
         req.params.source = req.params.source.replace(parsed.hostname, config.rewrite[parsed.hostname]);
       } else if (typeof config.rewrite[parsed.hostname] === 'object') {
         // 'facebook_profile_pic': { '/(\d+).jpg': 'https://graph.facebook.com/$1/picture' }
-        var regex_key = Object.keys(config.rewrite[parsed.hostname])
-          .filter(function (key) { return (parsed.path.match(new RegExp(key)) || []).length; })
+        const regex_key = Object.keys(config.rewrite[parsed.hostname])
+          .filter(key => (parsed.path.match(new RegExp(key)) || []).length)
           .shift();
 
         if(regex_key) {
@@ -77,7 +77,7 @@ module.exports = function (config) {
   /**
    * Source handler
    */
-  middleware.push(function fetchSource(req, res, next) {
+  middleware.push((req, res, next) => {
     const stream = temp.createWriteStream();
     stream.on('error', next);
     stream.on('finish', () => {
@@ -184,8 +184,6 @@ module.exports = function (config) {
     if (req.wrender && req.wrender.source) {
       fs.unlink(req.wrender.source.path);
     }
-
-    console.error(err);
 
     res
       .status(err.status || 500)
