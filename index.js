@@ -6,6 +6,7 @@ const imageType = require('image-type');
 const request = require('request');
 const sharp = require('sharp');
 const micromatch = require('micromatch');
+const url = require('url');
 
 const blank = new Buffer('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', 'base64');
 
@@ -30,12 +31,58 @@ module.exports = function (config) {
     hostBlacklist: [],
   }, config);
 
+  const middleware = [];
   const router = express.Router();
+
+  /**
+   * Validation
+   */
+  middleware.push(function (req, res, next) {
+    if (config.userAgent && req.headers['user-agent'] !== config.userAgent) {
+      return next(createError(403, 'User Agent forbidden'));
+    }
+    if (req.params.width > config.maxWidth || req.params.height > config.maxHeight) {
+      return next(createError(400, 'Requested image too large'));
+    }
+    if (config.hostWhitelist.length && !micromatch.any(req.params.source, config.hostWhitelist)) {
+      return next(createError(400, 'Invalid remote url'));
+    }
+    if (config.hostBlacklist.length && micromatch.any(req.params.source, config.hostBlacklist)) {
+      return next(createError(400, 'Invalid remote url'));
+    }
+
+    if (typeof config.rewrite === 'object') {
+      var parsed = url.parse(`http://${req.params.source}`);
+
+      if (typeof config.rewrite[parsed.hostname] === 'string') {
+        // 'facebook_profile_pic': 'graph.facebook.com'
+        req.params.source = req.params.source.replace(parsed.hostname, config.rewrite[parsed.hostname]);
+      } else if (typeof config.rewrite[parsed.hostname] === 'object') {
+        // 'facebook_profile_pic': { '/(\d+).jpg': 'https://graph.facebook.com/$1/picture' }
+        var regex_key = Object.keys(config.rewrite[parsed.hostname])
+          .filter(function (key) { return (parsed.path.match(new RegExp(key)) || []).length; })
+          .shift();
+
+        if(regex_key) {
+          // console.log(parsed);
+          // console.log(regex_key, config.rewrite[parsed.hostname][regex_key]);
+
+          req.params.source = parsed.path
+            // Replace the path with the replacement string, offering a capture group as required
+            .replace(new RegExp(regex_key), config.rewrite[parsed.hostname][regex_key])
+            // Remove the prefixing forward slash
+            .substr(1);
+        }
+      }
+    }
+
+    next();
+  });
 
   /**
    * Source handler
    */
-  const fetchSource = (req, res, next) => {
+  middleware.push(function fetchSource(req, res, next) {
     const stream = temp.createWriteStream();
     stream.on('error', next);
     stream.on('finish', () => {
@@ -87,46 +134,26 @@ module.exports = function (config) {
       r.pipe(stream);
     });
     r.on('error', error => stream.emit('error', error));
-  };
-
-  /**
-   * Validation
-   */
-  router.use((req,res, next) => {
-    if (config.userAgent && req.headers['user-agent'] !== config.userAgent) {
-      return next(createError(403, 'User Agent forbidden'));
-    }
-    if (req.params.width > config.maxWidth || req.params.height > config.maxHeight) {
-      return next(createError(400, 'Requested image too large'));
-    }
-    if (config.hostWhitelist.length && !micromatch.any(req.params.source, config.hostWhitelist)) {
-      return next(createError(400, 'Invalid remote url'));
-    }
-    if (config.hostBlacklist.length && micromatch.any(req.params.source, config.hostBlacklist)) {
-      return next(createError(400, 'Invalid remote url'));
-    }
-
-    next();
   });
 
   /**
    * Recipes
    */
-  router.get('/proxy/:source(*)', fetchSource);
-  router.get('/resize/:width/:height/:source(*)', fetchSource, (req, res, next) => {
+  router.get('/proxy/:source(*)', middleware);
+  router.get('/resize/:width/:height/:source(*)', middleware, (req, res, next) => {
     req.wrender.recipe.resize(parseInt(req.params.width, 10), parseInt(req.params.height, 10));
     req.wrender.recipe.ignoreAspectRatio();
     next();
   });
-  router.get('/resizex/:width/:source(*)', fetchSource, (req, res, next) => {
+  router.get('/resizex/:width/:source(*)', middleware, (req, res, next) => {
     req.wrender.recipe.resize(parseInt(req.params.width, 10));
     next();
   });
-  router.get('/resizey/:height/:source(*)', fetchSource, (req, res, next) => {
+  router.get('/resizey/:height/:source(*)', middleware, (req, res, next) => {
     req.wrender.recipe.resize(null, parseInt(req.params.height, 10));
     next();
   });
-  router.get('/crop/:width/:height/:source(*)', fetchSource, (req, res, next) => {
+  router.get('/crop/:width/:height/:source(*)', middleware, (req, res, next) => {
     req.wrender.recipe
       .resize(parseInt(req.params.width, 10), parseInt(req.params.height, 10))
       .crop(sharp.gravity.center);
@@ -166,17 +193,19 @@ module.exports = function (config) {
    * Error handler
    */
   // eslint-disable-next-line no-unused-vars
-  router.use((error, req, res, next) => {
+  router.use((err, req, res, next) => {
     if (req.wrender && req.wrender.source) {
       fs.unlink(req.wrender.source.path);
     }
 
+    console.error(err);
+
     res
-      .status(error.status || 500)
+      .status(err.status || 500)
       .set({
         'Content-Type': 'image/png',
         'Content-Length': blank.length,
-        'X-Wrender-Error': error.message
+        'X-Wrender-Error': err.message
       })
       .send(blank);
   });
