@@ -14,6 +14,20 @@ The recommended usage is part of a larger express-based application although a s
 
 ----
 
+### Compression Defaults
+
+- All images are converted to JPEG and compressed at quality level 85.
+
+- All EXIF data is stripped (including colour profiles).
+
+- All images are converted to sRGB colour space.
+
+- If include EXIF is set to true, all metadata is preserved, and an sRGB ICC colour profile is assigned.
+
+- Cache headers are set expire 1 year in the future. Set your web server or CDN to respect the headers.
+
+- Source images larger than 3000px in each dimension are not transformed and an error response is sent.
+
 ### Usage
 
 ```js
@@ -56,50 +70,55 @@ const options = {
     'hack.thepla.net',
   ],
 
-  // Optionally you can hide the source from your URLs by rewriting them on the fly
-  rewrite: {
-    // Either by directly replacing the hostname
-    blog_uploads: 'my-company-content.s3.amazonaws.com/uploads/blog',
-    // => http://localhost:3010/proxy/blog_uploads/57b7e6f33083dcc19380597da6b17a2f.jpg
-    // => http://localhost:3010/proxy/my-company-content.s3.amazonaws.com/uploads/blog/57b7e6f33083dcc19380597da6b17a2f.jpg
+  // Only allow sources specified as rewrites below.
+  // Disables all user-specified sources regardless of whitelist/blacklist
+  rewritesOnly: false,
 
-    // Or using regex to actually rewrite the URL
-    user_uploads: {
-      'profile/(.+)': 'my-company-content.s3.amazonaws.com/uploads/user/profile/$1',
-      // => http://localhost:3010/proxy/user_uploads/profile/57b7e6f33083dcc19380597da6b17a2f.jpg
-      // => http://localhost:3010/proxy/my-company-content.s3.amazonaws.com/uploads/user/profile/57b7e6f33083dcc19380597da6b17a2f.jpg
+  // Optionally you can hide the source from your URLs by rewriting them on the fly.
+  // Added to the router in order.
+  rewrites: [
+    {
+      // Match path (uses "path-to-regexp" same as Express)
+      path: '/uploads/:source(.*)',
 
-      'cover/(.+)': 'my-company-content.s3.amazonaws.com/uploads/user/cover/$1',
-      // => http://localhost:3010/proxy/user_uploads/cover/57b7e6f33083dcc19380597da6b17a2f.jpg
-      // => http://localhost:3010/proxy/my-company-content.s3.amazonaws.com/uploads/user/cover/57b7e6f33083dcc19380597da6b17a2f.jpg
+      // Source URI prefix. Protocol is optional and will default to `http://`
+      origin: 'https://uploads-bucket.s3.amazonaws.com/workspace/uploads/',
+
+      // Request options
+      // https://github.com/request/request#requestoptions-callback
+      request: {
+        headers: {
+          'X-Wrender-Token': '1234abcd',
+        },
+        qs: {
+          foo: 'bar',
+        },
+        auth: {
+          'user': 'username',
+          'pass': 'password',
+          'sendImmediately': false
+        },
+      },
     },
 
-    facebook_profile_pic: {
-      '(\\d+).jpg': 'graph.facebook.com/$1/picture',
-      // => http://localhost:3010/proxy/facebook_profile_pic/113741208636938.jpg
-      // => http://localhost:3010/proxy/graph.facebook.com/113741208636938/picture
+    // Example: Facebook profile pictures
+    // This request: {wrender}/crop/100/60/fb/101203123/picture
+    // Fetches the source from: http://graph.facebook.com/101203123/picture?width=1024&height=1024
+    // And is then cropped to 100x60 as per the recipe
+    {
+      path: '/fb/:source(.*)',
+      origin: 'graph.facebook.com/',
+      qs: { width: 1024, height: 1024 },
     },
-  }
+
+  ],
+
 };
 
 // As part of your Express appp
 app.use('/images', wrender(options));
 
 ```
-
-### Compression Defaults
-
-- All images are converted to JPEG and compressed at quality level 85.
-
-- All EXIF data is stripped (including colour profiles).
-
-- All images are converted to sRGB colour space.
-
-- If include EXIF is set to true, all metadata is preserved, and an sRGB ICC colour profile is assigned.
-
-- Cache headers are set expire 1 year in the future. Set your web server or CDN to respect the headers.
-
-- Source images larger than 3000px in each dimension are not transformed and an error response is sent.
 
 ### Recipes
 
@@ -149,10 +168,6 @@ Expand the functionality of the image processing recipes. A list of Sharp's tran
 **Extensibility**
 
 Add the ability to add custom recipe routes before mounting wrender to the express app.
-
-**Request**
-
-Handle more complicated request flow when fetching the source image. For example, request will follow redirects by default, but if it redirects to a blacklisted domain, wrender does not stop this happening.
 
 **Tests**
 

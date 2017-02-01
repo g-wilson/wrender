@@ -5,7 +5,7 @@ const readChunk = require('read-chunk');
 const imageType = require('image-type');
 const sharp = require('sharp');
 const micromatch = require('micromatch');
-const url = require('url');
+const pathToRegexp = require('path-to-regexp');
 
 const blank = new Buffer('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', 'base64');
 const configureRequests = require('./lib/request');
@@ -23,7 +23,16 @@ module.exports = function (config) {
     timeout: 10000,
     hostWhitelist: [],
     hostBlacklist: [],
+    rewrites: [],
   }, config || {});
+
+  // Build RegExp objects here (on-boot) for performance
+  if (Array.isArray(config.rewrites) && config.rewrites.length) {
+    config.rewrites = config.rewrites.map(rewrite => {
+      rewrite.regexp = pathToRegexp(rewrite.path);
+      return rewrite;
+    });
+  }
 
   const middleware = [];
   const request = configureRequests(config);
@@ -33,6 +42,8 @@ module.exports = function (config) {
    * Validation
    */
   middleware.push((req, res, next) => {
+    req.wrender = {};
+
     if (config.userAgent && req.headers['user-agent'] !== config.userAgent) {
       return next(errors(403, 'User Agent forbidden'));
     }
@@ -46,30 +57,20 @@ module.exports = function (config) {
       return next(errors(400, 'Invalid remote url'));
     }
 
-    if (typeof config.rewrite === 'object') {
-      const parsed = url.parse(`http://${req.params.source}`);
+    if (!Array.isArray(config.rewrites) || !config.rewrites.length) return next();
 
-      if (typeof config.rewrite[parsed.hostname] === 'string') {
-        // 'facebook_profile_pic': 'graph.facebook.com'
-        req.params.source = req.params.source.replace(parsed.hostname, config.rewrite[parsed.hostname]);
-      } else if (typeof config.rewrite[parsed.hostname] === 'object') {
-        // 'facebook_profile_pic': { '/(\d+).jpg': 'https://graph.facebook.com/$1/picture' }
-        const regex_key = Object.keys(config.rewrite[parsed.hostname])
-          .filter(key => (parsed.path.match(new RegExp(key)) || []).length)
-          .shift();
+    // Check rewrites.
+    // If one is found, modify the source param to the origin source URL.
+    let matchFound = false;
+    config.rewrites.forEach(alias => {
+      if (matchFound) return;
+      const matches = (`/${req.params.source}`).match(alias.regexp);
+      if (!matches) return;
+      matchFound = true;
 
-        if(regex_key) {
-          // console.log(parsed);
-          // console.log(regex_key, config.rewrite[parsed.hostname][regex_key]);
-
-          req.params.source = parsed.path
-            // Replace the path with the replacement string, offering a capture group as required
-            .replace(new RegExp(regex_key), config.rewrite[parsed.hostname][regex_key])
-            // Remove the prefixing forward slash
-            .substr(1);
-        }
-      }
-    }
+      req.params.source = alias.origin + matches[1];
+      if (alias.request) req.wrender.requestOpts = Object.assign({}, alias.request);
+    });
 
     next();
   });
@@ -78,13 +79,16 @@ module.exports = function (config) {
    * Source handler
    */
   middleware.push((req, res, next) => {
+
+    // Temporary file (as a readable stream) representing the source image
     const stream = temp.createWriteStream();
     stream.on('error', next);
+
+    // When the source is downloaded to temp stream, we can kickstart the processing
     stream.on('finish', () => {
       const type = imageType(readChunk.sync(stream.path, 0, 12)); // First 12 bytes contains the mime type header
       if (!type) return next(errors.ArgumentError('INVALID_IMG', `Source file is not an image: ${req.originalUrl}`));
 
-      req.wrender = {};
       req.wrender.mimetype = type.mime;
       req.params.quality = config.quality;
       req.wrender.source = fs.createReadStream(stream.path);
@@ -118,7 +122,10 @@ module.exports = function (config) {
       next();
     });
 
-    request(req.params.source)
+    // Build the request for the source image
+    req.wrender.requestOpts = req.wrender.requestOpts || {};
+    req.wrender.requestOpts.url = req.params.source;
+    request.get(req.wrender.requestOpts)
       .then(r => r.pipe(stream))
       .catch(err => stream.emit('error', err));
   });
@@ -184,6 +191,9 @@ module.exports = function (config) {
     if (req.wrender && req.wrender.source) {
       fs.unlink(req.wrender.source.path);
     }
+
+    // eslint-disable-next-line no-console
+    if (process.env.NODE_ENV === 'development') console.error(err);
 
     res
       .status(err.status || 500)

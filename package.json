@@ -1,6 +1,6 @@
 {
   "name": "wrender",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Image compression and transformation reverse-proxy for Express apps",
   "main": "index.js",
   "engines": {
@@ -22,7 +22,8 @@
   ],
   "author": "George Wilson <george@g-wilson.co.uk>",
   "files": [
-    "index.js", "lib"
+    "index.js",
+    "lib"
   ],
   "repository": {
     "type": "git",
@@ -33,6 +34,7 @@
     "express": "^4.14.0",
     "image-type": "^3.0.0",
     "micromatch": "^2.3.11",
+    "path-to-regexp": "^1.7.0",
     "read-chunk": "^2.0.0",
     "request": "^2.79.0",
     "sharp": "^0.17.1",
