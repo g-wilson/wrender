@@ -157,7 +157,6 @@ Resizes the source image to the desired height, maintaining aspect ratio.
 `/crop/:width/:height/:source`
 
 Resizes the source image to the desired dimensions (maintaining aspect ratio), then performs a crop from the centre.
-s
 
 ### TODO
 
