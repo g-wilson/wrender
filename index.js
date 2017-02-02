@@ -46,20 +46,20 @@ module.exports = function (config) {
     req.wrender = {};
 
     if (config.userAgent && req.headers['user-agent'] !== config.userAgent) {
-      return next(errors(403, 'User Agent forbidden'));
+      return next(errors.ArgumentError('USER_AGENT_FORBIDDEN', new Error('User Agent forbidden')));
     }
     if (req.params.width > config.maxWidth || req.params.height > config.maxHeight) {
-      return next(errors(400, 'Requested image too large'));
+      return next(errors.ArgumentError('SRC_TOO_LARGE', new Error('Requested image too large')));
     }
     if (config.hostWhitelist.length && !micromatch.any(req.params.source, config.hostWhitelist)) {
-      return next(errors(400, 'Invalid remote URL'));
+      return next(errors.ArgumentError('INVALID_SRC_URL', new Error('Invalid remote URL')));
     }
     if (config.hostBlacklist.length && micromatch.any(req.params.source, config.hostBlacklist)) {
-      return next(errors(400, 'Invalid remote URL'));
+      return next(errors.ArgumentError('INVALID_SRC_URL', new Error('Invalid remote URL')));
     }
 
     if (!Array.isArray(config.rewrites) || !config.rewrites.length) {
-      if (config.rewritesOnly) return next(errors(400, 'Remote URL does not match any sources'));
+      if (config.rewritesOnly) return next(errors.ArgumentError('INVALID_SRC_URL', new Error('Remote URL does not match any sources')));
       return next();
     }
 
@@ -77,7 +77,7 @@ module.exports = function (config) {
     });
 
     if (config.rewritesOnly && !matchFound) {
-      return next(errors(400, 'Remote URL does not match any sources'));
+      return next(errors.ArgumentError('INVALID_SRC_URL', new Error('Remote URL does not match any sources')));
     }
 
     next();
@@ -95,7 +95,7 @@ module.exports = function (config) {
     // When the source is downloaded to temp stream, we can kickstart the processing
     stream.on('finish', () => {
       const type = imageType(readChunk.sync(stream.path, 0, 12)); // First 12 bytes contains the mime type header
-      if (!type) return next(errors.ArgumentError('INVALID_IMG', `Source file is not an image: ${req.originalUrl}`));
+      if (!type) return next(errors.ArgumentError(new Error('INVALID_IMG', new Error(`Source file is not an image: ${req.originalUrl}`))));
 
       req.wrender.mimetype = type.mime;
       req.params.quality = config.quality;
