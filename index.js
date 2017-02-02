@@ -21,6 +21,7 @@ module.exports = function (config) {
     maxHeight: 3000,
     maxAge: 31536000, // ~1y
     timeout: 10000,
+    rewritesOnly: false,
     hostWhitelist: [],
     hostBlacklist: [],
     rewrites: [],
@@ -51,13 +52,16 @@ module.exports = function (config) {
       return next(errors(400, 'Requested image too large'));
     }
     if (config.hostWhitelist.length && !micromatch.any(req.params.source, config.hostWhitelist)) {
-      return next(errors(400, 'Invalid remote url'));
+      return next(errors(400, 'Invalid remote URL'));
     }
     if (config.hostBlacklist.length && micromatch.any(req.params.source, config.hostBlacklist)) {
-      return next(errors(400, 'Invalid remote url'));
+      return next(errors(400, 'Invalid remote URL'));
     }
 
-    if (!Array.isArray(config.rewrites) || !config.rewrites.length) return next();
+    if (!Array.isArray(config.rewrites) || !config.rewrites.length) {
+      if (config.rewritesOnly) return next(errors(400, 'Remote URL does not match any sources'));
+      return next();
+    }
 
     // Check rewrites.
     // If one is found, modify the source param to the origin source URL.
@@ -71,6 +75,10 @@ module.exports = function (config) {
       req.params.source = alias.origin + matches[1];
       if (alias.request) req.wrender.requestOpts = Object.assign({}, alias.request);
     });
+
+    if (config.rewritesOnly && !matchFound) {
+      return next(errors(400, 'Remote URL does not match any sources'));
+    }
 
     next();
   });
