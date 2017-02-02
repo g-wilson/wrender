@@ -1,6 +1,5 @@
 const fs = require('fs');
 const express = require('express');
-const temp = require('temp').track();
 const readChunk = require('read-chunk');
 const imageType = require('image-type');
 const sharp = require('sharp');
@@ -40,7 +39,7 @@ module.exports = function (config) {
   const router = express.Router();
 
   /**
-   * Validation
+   * Source handler
    */
   middleware.push((req, res, next) => {
     req.wrender = {};
@@ -60,82 +59,69 @@ module.exports = function (config) {
 
     if (!Array.isArray(config.rewrites) || !config.rewrites.length) {
       if (config.rewritesOnly) return next(errors.ArgumentError('INVALID_SRC_URL', new Error('Remote URL does not match any sources')));
-      return next();
+    } else {
+      // Check rewrites.
+      // If one is found, modify the source param to the origin source URL.
+      let matchFound = false;
+      config.rewrites.forEach(alias => {
+        if (matchFound) return;
+        const matches = (`/${req.params.source}`).match(alias.regexp);
+        if (!matches) return;
+        matchFound = true;
+
+        req.params.source = alias.origin + matches[1];
+        if (alias.request) req.wrender.requestOpts = Object.assign({}, alias.request);
+      });
+
+      if (config.rewritesOnly && !matchFound) {
+        return next(errors.ArgumentError('INVALID_SRC_URL', new Error('Remote URL does not match any sources')));
+      }
     }
 
-    // Check rewrites.
-    // If one is found, modify the source param to the origin source URL.
-    let matchFound = false;
-    config.rewrites.forEach(alias => {
-      if (matchFound) return;
-      const matches = (`/${req.params.source}`).match(alias.regexp);
-      if (!matches) return;
-      matchFound = true;
+    req.wrender.requestOpts = req.wrender.requestOpts || {};
+    req.wrender.requestOpts.url = req.params.source;
 
-      req.params.source = alias.origin + matches[1];
-      if (alias.request) req.wrender.requestOpts = Object.assign({}, alias.request);
-    });
-
-    if (config.rewritesOnly && !matchFound) {
-      return next(errors.ArgumentError('INVALID_SRC_URL', new Error('Remote URL does not match any sources')));
-    }
-
-    next();
+    request.fetchSourceMiddleware(req, res, next);
   });
 
   /**
-   * Source handler
+   * Prepare Sharp for image processing
    */
   middleware.push((req, res, next) => {
+    const type = imageType(readChunk.sync(req.wrender.temp.path, 0, 12)); // First 12 bytes contains the mime type header
+    if (!type) return next(errors.ArgumentError('INVALID_IMG', new Error(`Source file is not an image: ${req.originalUrl}`)));
 
-    // Temporary file (as a readable stream) representing the source image
-    const stream = temp.createWriteStream();
-    stream.on('error', next);
+    req.wrender.mimetype = type.mime;
+    req.params.quality = config.quality;
+    req.wrender.source = fs.createReadStream(req.wrender.temp.path);
+    req.wrender.source.on('error', next);
 
-    // When the source is downloaded to temp stream, we can kickstart the processing
-    stream.on('finish', () => {
-      const type = imageType(readChunk.sync(stream.path, 0, 12)); // First 12 bytes contains the mime type header
-      if (!type) return next(errors.ArgumentError(new Error('INVALID_IMG', new Error(`Source file is not an image: ${req.originalUrl}`))));
+    // If we are not converting GIFs we must direct proxy the image. Sharp cannot process (animated) GIFs.
+    if (!config.convertGIF && req.wrender.mimetype === 'image/gif') return next();
 
-      req.wrender.mimetype = type.mime;
-      req.params.quality = config.quality;
-      req.wrender.source = fs.createReadStream(stream.path);
-      req.wrender.source.on('error', next);
+    req.wrender.recipe = sharp();
+    req.wrender.recipe
+      .on('error', next)
+      .on('finish', () => fs.unlink(req.wrender.source.path));
 
-      // If we are not converting GIFs we must direct proxy the image. Sharp cannot process (animated) GIFs.
-      if (!config.convertGIF && req.wrender.mimetype === 'image/gif') return next();
+    // Convert to JPEG? GIFs become still-frames
+    if (
+      req.wrender.mimetype !== 'image/jpeg' &&
+      (config.convertGIF && req.wrender.mimetype === 'image/gif') &&
+      (config.convertPNG && req.wrender.mimetype === 'image/png')
+    ) {
+      req.wrender.recipe.background({ r: 0, g: 0, b: 0, alpha: 0 });
+      req.wrender.recipe.flatten();
+      req.wrender.recipe.toFormat(sharp.format.jpeg);
+      req.wrender.mimetype = 'image/jpeg';
+    }
 
-      req.wrender.recipe = sharp();
-      req.wrender.recipe
-        .on('error', next)
-        .on('finish', () => fs.unlink(req.wrender.source.path));
+    // Respect EXIF orientation headers
+    if (req.wrender.mimetype === 'image/jpeg') {
+      req.wrender.recipe.rotate();
+    }
 
-      // Convert to JPEG? GIFs become still-frames
-      if (
-        req.wrender.mimetype !== 'image/jpeg' &&
-        (config.convertGIF && req.wrender.mimetype === 'image/gif') &&
-        (config.convertPNG && req.wrender.mimetype === 'image/png')
-      ) {
-        req.wrender.recipe.background({ r: 0, g: 0, b: 0, alpha: 0 });
-        req.wrender.recipe.flatten();
-        req.wrender.recipe.toFormat(sharp.format.jpeg);
-        req.wrender.mimetype = 'image/jpeg';
-      }
-
-      // Respect EXIF orientation headers
-      if (req.wrender.mimetype === 'image/jpeg') {
-        req.wrender.recipe.rotate();
-      }
-
-      next();
-    });
-
-    // Build the request for the source image
-    req.wrender.requestOpts = req.wrender.requestOpts || {};
-    req.wrender.requestOpts.url = req.params.source;
-    request.get(req.wrender.requestOpts)
-      .then(r => r.pipe(stream))
-      .catch(err => stream.emit('error', err));
+    next();
   });
 
   /**
