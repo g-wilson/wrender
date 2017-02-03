@@ -12,6 +12,14 @@ The image processing is extremely fast and is handled by [Sharp](https://github.
 
 The recommended usage is part of a larger express-based application although a simple server is provided for example, testing and non-production environments. Rate-limiting, authentication, logging, and other such features can be implemented alongside and are not provided here.
 
+```js
+const express = require('express');
+const wrender = require('wrender');
+
+const app = express();
+app.use('/images', wrender());
+```
+
 ----
 
 ### Compression Defaults
@@ -34,28 +42,28 @@ The recommended usage is part of a larger express-based application although a s
 
 const wrender = require('wrender');
 
-// Available options with their default values
+// Available options, all totally optional
 const options = {
 
   // JPEG compression level to apply
-  quality: 85,
+  quality: 85, // Default
 
   // Optionally preserve original format
-  convertGIF: true,
-  convertPNG: true,
+  convertGIF: true, // Default
+  convertPNG: true, // Default
 
   // Include source image metadata
-  includeEXIF: false,
+  includeEXIF: false, // Default
 
   // Maximum output image dimensions allowed
-  maxWidth: 3000,
-  maxHeight: 3000,
+  maxWidth: 3000, // Default
+  maxHeight: 3000, // Default
 
   // Response 'max age' cache header (seconds)
-  maxAge: 31536000,
+  maxAge: 31536000, // Default
 
   // Timeout for fetching source image
-  timeout: 10000,
+  timeout: 10000, // Default
 
   // Only allow specified UA
   userAgent: 'Amazon CloudFront',
@@ -72,7 +80,7 @@ const options = {
 
   // Only allow sources specified as rewrites below.
   // Disables all user-specified sources regardless of whitelist/blacklist
-  rewritesOnly: false,
+  rewritesOnly: false, // Default
 
   // Optionally you can hide the source from your URLs by rewriting them on the fly.
   // Added to the router in order.
@@ -113,12 +121,52 @@ const options = {
 
   ],
 
+  // You can specify your own recipes, or use the pre-defined ones, or both!
+  // Skip this property to use the default recipes
+  recipes: [
+    // You can pick recipes from wrender you want to use
+    wrender.recipes.proxy,
+
+    // You can pick recipes from wrender and pass them default values
+    // Useful to hide options from the URLs
+    {
+      path: '/thumbnail/:source',
+      recipe: wrender.invoke(wrender.recipes.resizex, { width: 150 }),
+    },
+
+    // You can also write your own synchronous recipes
+    {
+      path: '/rotate/:angle/:source',
+      recipe(image, params) {
+        image.rotate(parseInt(params.angle, 10));
+      },
+    },
+
+    // You can also write your own asynchronous recipes
+    {
+      path: '/rotate/:angle/:source',
+      recipe(image, params, next) {
+        image.rotate(parseInt(params.angle, 10));
+        next();
+      },
+    },
+  ],
+
+  // If you want to use our recipes AND your own, that's easy to do too:
+  recipes: wrender.recipes.defaults.concat([
+    {
+      path: '/teeny/:source',
+      recipe: wrender.invoke(wrender.recipes.crop, { height: 100, width: 100 }),
+    }
+  ])
+
 };
 
-// As part of your Express appp
+// As part of your Express app
 app.use('/images', wrender(options));
-
 ```
+
+----
 
 ### Recipes
 
@@ -158,15 +206,13 @@ Resizes the source image to the desired height, maintaining aspect ratio.
 
 Resizes the source image to the desired dimensions (maintaining aspect ratio), then performs a crop from the centre.
 
+----
+
 ### TODO
 
 **Recipes**
 
 Expand the functionality of the image processing recipes. A list of Sharp's transformation methods can be found [here](http://sharp.dimens.io/en/stable/api-operation/).
-
-**Extensibility**
-
-Add the ability to add custom recipe routes before mounting wrender to the express app.
 
 **Tests**
 

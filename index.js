@@ -1,3 +1,7 @@
+/**
+ * Welcome to the Wrender
+ * We got fun and games
+ */
 const fs = require('fs');
 const express = require('express');
 const readChunk = require('read-chunk');
@@ -6,10 +10,21 @@ const sharp = require('sharp');
 const micromatch = require('micromatch');
 const pathToRegexp = require('path-to-regexp');
 
+const debugLog = require('debug')('wrender:route');
+const errorLog = require('debug')('wrender:error');
+
 const blank = new Buffer('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', 'base64');
 const configureRequests = require('./lib/request');
 const errors = require('./lib/errors');
+const recipes = require('./recipes');
 
+/**
+ * The main wrender function
+ * See README.md for usage
+ *
+ * @param {Object} config (Optional)
+ * @return {Router} An Express Router
+ */
 module.exports = function (config) {
   config = Object.assign({
     quality: 85,
@@ -24,6 +39,7 @@ module.exports = function (config) {
     hostWhitelist: [],
     hostBlacklist: [],
     rewrites: [],
+    recipes: recipes.defaults,
   }, config || {});
 
   // Build RegExp objects here (on-boot) for performance
@@ -125,36 +141,33 @@ module.exports = function (config) {
   });
 
   /**
-   * Recipes
+   * Recipes handler
+   * All hail the standalone recipe functions!
    */
-  router.get('/proxy/:source(*)', middleware);
-  router.get('/resize/:width/:height/:source(*)', middleware, (req, res, next) => {
-    req.wrender.recipe.resize(parseInt(req.params.width, 10), parseInt(req.params.height, 10));
-    req.wrender.recipe.ignoreAspectRatio();
-    next();
-  });
-  router.get('/resizex/:width/:source(*)', middleware, (req, res, next) => {
-    req.wrender.recipe.resize(parseInt(req.params.width, 10));
-    next();
-  });
-  router.get('/resizey/:height/:source(*)', middleware, (req, res, next) => {
-    req.wrender.recipe.resize(null, parseInt(req.params.height, 10));
-    next();
-  });
-  router.get('/crop/:width/:height/:source(*)', middleware, (req, res, next) => {
-    req.wrender.recipe
-      .resize(parseInt(req.params.width, 10), parseInt(req.params.height, 10))
-      .crop(sharp.gravity.center);
-      // .crop(sharp.strategy.entropy);
-      // .crop(sharp.strategy.attention);
-    next();
+  config.recipes.forEach(r => {
+    if (typeof r.path !== 'string') throw new Error('Expected recipe to have a path');
+    if (r.path.indexOf('/:source') < 0) throw new Error(`Expected recipe path ${r.path} to have a source parameter`);
+    if (typeof r.recipe !== 'function') throw new Error('Expected recipe to have a function');
+
+    debugLog('Registering ' + (r.name || r.path));
+
+    router.get(r.path.replace(':source', ':source(*)'), middleware, (recipe => {
+      if (recipe.length === 3) {
+        return (req, res, next) => recipe(req.wrender.recipe, req.params, next);
+      } else {
+        return (req, res, next) => {
+          recipe(req.wrender.recipe, req.params);
+          next();
+        };
+      }
+    })(r.recipe));
   });
 
   /**
    * Response handler
    */
   router.use((req, res, next) => {
-    if (!req.wrender) return next(errors.NotFoundError(null, 'Wrender not found'));
+    if (!req.wrender) return next(errors.NotFoundError('ROUTE_NOT_FOUND', '404 Not Found'));
 
     res.setHeader('Content-Type', req.wrender.mimetype);
     res.setHeader('Cache-Control', `public, max-age=${config.maxAge}`);
@@ -186,8 +199,7 @@ module.exports = function (config) {
       fs.unlink(req.wrender.source.path);
     }
 
-    // eslint-disable-next-line no-console
-    if (process.env.NODE_ENV === 'development') console.error(err);
+    errorLog(err);
 
     res
       .status(err.status || 500)
@@ -201,3 +213,31 @@ module.exports = function (config) {
 
   return router;
 };
+
+/**
+ * Invoke a pre-defined recipe with a fixed set of parameters
+ * See README.md for usage
+ * Any params in the URL will override the defaults passed here
+ *
+ * @param {Object} recipe A recipe object (with path & recipe function)
+ * @param {Object} defaults A plain object to be the parameters passed to the recipe
+ * @return {Function} A recipe function
+ */
+module.exports.invoke = function (recipe, defaults) {
+  if (!recipe.path || !recipe.recipe || typeof recipe !== 'function') {
+    throw new Error('Expected first argument to be a valid recipe object: { path: ..., recipe() {...} }');
+  }
+  if (!defaults || !Object.keys(defaults).length) {
+    throw new Error('Expected second argument to be a non-empty plain object');
+  }
+
+  if (recipe.length === 3) {
+    // If this recipe expects a callback
+    return (image, params, next) => recipe(image, Object.assign({}, defaults, params), next);
+  } else {
+    // Else this recipe does not expect a callback
+    return (image, params) => recipe(image, Object.assign({}, defaults, params));
+  }
+};
+
+module.exports.recipes = recipes;
