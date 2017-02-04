@@ -23,7 +23,8 @@
   "author": "George Wilson <george@g-wilson.co.uk>",
   "files": [
     "index.js",
-    "lib"
+    "lib",
+    "recipes",
   ],
   "repository": {
     "type": "git",
