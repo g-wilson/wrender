@@ -1,0 +1,14 @@
+{
+  "ignore": [
+    ".git",
+    "coverage",
+    "docs",
+    "node_modules",
+    "tests"
+  ],
+  "env": {
+    "DEBUG": "wrender:*",
+    "NODE_ENV": "development"
+  },
+  "ext": "js"
+}
