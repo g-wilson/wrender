@@ -49,6 +49,12 @@
     "image-size": "^0.5.1",
     "istanbul": "^0.4.5",
     "mocha": "^3.2.0",
-    "nock": "^9.0.2"
+    "nock": "^9.0.2",
+    "serve-static": "^1.11.2",
+    "supertest": "^3.0.0"
+  },
+  "engines" : {
+    "node" : "~6.9.4",
+    "npm" : "~3.10.9"
   }
 }
