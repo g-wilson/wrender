@@ -224,19 +224,19 @@ module.exports = function (config) {
  * @return {Function} A recipe function
  */
 module.exports.invoke = function (recipe, defaults) {
-  if (!recipe.path || !recipe.recipe || typeof recipe !== 'function') {
+  if (!recipe.path || !recipe.hasOwnProperty('recipe') || typeof recipe.recipe !== 'function') {
     throw new Error('Expected first argument to be a valid recipe object: { path: ..., recipe() {...} }');
   }
   if (!defaults || !Object.keys(defaults).length) {
     throw new Error('Expected second argument to be a non-empty plain object');
   }
 
-  if (recipe.length === 3) {
+  if (recipe.recipe.length === 3) {
     // If this recipe expects a callback
-    return (image, params, next) => recipe(image, Object.assign({}, defaults, params), next);
+    return (image, params, next) => recipe.recipe(image, Object.assign({}, defaults, params), next);
   } else {
     // Else this recipe does not expect a callback
-    return (image, params) => recipe(image, Object.assign({}, defaults, params));
+    return (image, params) => recipe.recipe(image, Object.assign({}, defaults, params));
   }
 };
 
