@@ -1,6 +1,6 @@
 {
   "name": "wrender",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Image compression and transformation reverse-proxy for Express apps",
   "main": "index.js",
   "engines": {
@@ -24,7 +24,7 @@
   "files": [
     "index.js",
     "lib",
-    "recipes",
+    "recipes"
   ],
   "repository": {
     "type": "git",
