@@ -1,8 +1,23 @@
 const assert = require('assert');
+const debug = require('debug')('wrender:tests:images');
+const express = require('express');
 const fs = require('fs');
+const http = require('http');
 const images = module.exports = {};
 const path = require('path');
+const serveStatic = require('serve-static');
 const sharp = require('sharp');
+
+images.assertHeaders = function ({ headers }) {
+  assert.equal(headers['content-type'], 'image/png');
+  assert.equal(headers['x-wrender-error'], undefined);
+};
+
+images.createExpressApp = function (route) {
+  const app = express();
+  app.use(route);
+  return app;
+};
 
 images.getArtifactsPath = function (file) {
   return path.join(__dirname, 'artifacts', file);
@@ -39,4 +54,23 @@ images.run = function (opts, callback) {
   // Connect the pipes and run!
   source.pipe(image);
   image.pipe(dest);
+};
+
+images.staticFixturesServer = function (callback) {
+  const app = images.createExpressApp(serveStatic(images.getFixturesPath(''), {
+    dotfiles: 'ignore',
+    etag: 'false',
+    redirect: false,
+  }));
+
+  const server = http.createServer(app);
+  server.listen(0, 'localhost', () => {
+    debug('Server listening on ' + server.address().hostname + ':' + server.address().port);
+    callback({
+      port: server.address().port,
+
+      server,
+      app,
+    });
+  });
 };
