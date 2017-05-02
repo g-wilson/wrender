@@ -7,7 +7,10 @@
     "node": ">= 6.9.0"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "pretest": "npm run test-artifacts-reset",
+    "posttest": "istanbul check-coverage",
+    "test": "istanbul cover _mocha -- tests/*.test.js tests/**/*.test.js",
+    "test-artifacts-reset": "rm -rf tests/artifacts && mkdir tests/artifacts"
   },
   "keywords": [
     "image",
@@ -41,5 +44,17 @@
     "request": "^2.79.0",
     "sharp": "^0.17.1",
     "temp": "^0.8.3"
+  },
+  "devDependencies": {
+    "image-size": "^0.5.1",
+    "istanbul": "^0.4.5",
+    "mocha": "^3.2.0",
+    "nock": "^9.0.2",
+    "serve-static": "^1.11.2",
+    "supertest": "^3.0.0"
+  },
+  "engines" : {
+    "node" : "~6.9.4",
+    "npm" : "~3.10.9"
   }
 }
