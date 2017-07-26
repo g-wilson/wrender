@@ -22,6 +22,22 @@ app.use('/images', wrender());
 
 ----
 
+### Roadmap
+
+- [x] Rewrites ("route aliases")
+- [x] Proxy origin: Blacklist/whitelist
+- [x] Proxy orign: Redirects, basic auth
+- [x] Pluggable recipes
+- [ ] Pluggable origins
+- [ ] Proxy origin: support for TLS requests
+- [ ] Dockerfile
+- [ ] Integration tests
+- [ ] CI
+- [ ] Origin: Private S3 buckets using IAM
+- [ ] Recipe: Watermark/overlay
+
+----
+
 ### Compression Defaults
 
 - All images are converted to JPEG and compressed at quality level 85.
@@ -205,15 +221,3 @@ Resizes the source image to the desired height, maintaining aspect ratio.
 `/crop/:width/:height/:source`
 
 Resizes the source image to the desired dimensions (maintaining aspect ratio), then performs a crop from the centre.
-
-----
-
-### TODO
-
-**Recipes**
-
-Expand the functionality of the image processing recipes. A list of Sharp's transformation methods can be found [here](http://sharp.dimens.io/en/stable/api-operation/).
-
-**Tests**
-
-The initial version is quite messy, everything is one file. I'd like to refactor it so that unit tests can be written for each stage of the process, and also have some end-to-end tests to check things like the response headers.
