@@ -43,6 +43,8 @@ The recommended usage is part of a larger express-based application although a s
 
 - Source images larger than 3000px in each dimension are not transformed and an error response is sent.
 
+----
+
 ### Usage
 
 ```js
@@ -100,6 +102,8 @@ Resizes the source image to the desired height, maintaining aspect ratio.
 `/crop/:width/:height/:source`
 
 Resizes the source image to the desired dimensions (maintaining aspect ratio), then performs a crop from the centre.
+
+----
 
 ### Full Example
 
@@ -180,6 +184,8 @@ const instance = wrender({
 app.use('/images', instance)
 ```
 
+----
+
 ### Custom Recipes
 
 Custom recipes are designed to allow the developer to customise the way in which images are transformed before being served to the client.
@@ -220,6 +226,8 @@ wrender.createRecipe('/rotate/:angle/:source', (image, { angle }, next) => {
   next();
 })
 ```
+
+----
 
 ### Custom Origins
 
