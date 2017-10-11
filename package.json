@@ -3,11 +3,9 @@
   "version": "1.0.0",
   "description": "Image compression and transformation reverse-proxy for Express apps",
   "main": "index.js",
-  "engines": {
-    "node": "~8.6.0",
-    "npm": "~5.3.0"
-  },
   "scripts": {
+    "dev": "nodemon server.js",
+    "lint": "eslint .",
     "pretest": "npm run test-artifacts-reset",
     "posttest": "istanbul check-coverage",
     "test": "istanbul cover _mocha -- tests/*.test.js tests/**/*.test.js",
@@ -63,11 +61,19 @@
     "temp": "^0.8.3"
   },
   "devDependencies": {
+    "eslint": "^4.8.0",
+    "eslint-plugin-mocha": "^4.11.0",
     "image-size": "^0.5.1",
     "istanbul": "^0.4.5",
     "mocha": "^3.2.0",
+    "morgan": "^1.9.0",
     "nock": "^9.0.2",
+    "nodemon": "^1.12.1",
     "serve-static": "^1.11.2",
     "supertest": "^3.0.0"
+  },
+  "engines": {
+    "node": "~8.6.0",
+    "npm": "~5.3.0"
   }
 }

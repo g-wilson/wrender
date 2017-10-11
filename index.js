@@ -1,243 +1,136 @@
-/**
- * Welcome to the Wrender
- * We got fun and games
- */
-const fs = require('fs');
 const express = require('express');
-const readChunk = require('read-chunk');
+const fs = require('fs');
 const imageType = require('image-type');
+const path = require('path');
+const readChunk = require('read-chunk');
 const sharp = require('sharp');
-const micromatch = require('micromatch');
-const pathToRegexp = require('path-to-regexp');
+const temp = require('temp');
 
-const debugLog = require('debug')('wrender:route');
-const errorLog = require('debug')('wrender:error');
+const originsController = require('./src/origins');
+const recipesController = require('./src/recipes');
 
-const blank = new Buffer('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', 'base64');
-const configureRequests = require('./lib/request');
-const errors = require('./lib/errors');
-const recipes = require('./recipes');
-
-/**
- * The main wrender function
- * See README.md for usage
- *
- * @param {Object} config (Optional)
- * @return {Router} An Express Router
- */
-module.exports = function (config) {
-  config = Object.assign({
-    quality: 85,
-    convertGIF: true,
-    convertPNG: true,
-    includeEXIF: false,
-    maxWidth: 3000,
-    maxHeight: 3000,
-    maxAge: 31536000, // ~1y
-    timeout: 10000,
-    rewritesOnly: false,
-    hostWhitelist: [],
-    hostBlacklist: [],
-    rewrites: [],
-    recipes: recipes.defaults,
-  }, config || {});
-
-  // Build RegExp objects here (on-boot) for performance
-  if (Array.isArray(config.rewrites) && config.rewrites.length) {
-    config.rewrites = config.rewrites.map(rewrite => {
-      rewrite.regexp = pathToRegexp(rewrite.path);
-      return rewrite;
-    });
-  }
-
-  const middleware = [];
-  const request = configureRequests(config);
+function wrender(config) {
+  let { recipes, origins } = config;
   const router = express.Router();
 
-  /**
-   * Source handler
-   */
-  middleware.push((req, res, next) => {
-    req.wrender = {};
+  // Ensure there is a list of recipes
+  if (!Array.isArray(recipes)) recipes = [ recipesController.recipes.proxy, recipesController.recipes.resize ];
+  // Ensure there is a list of origins
+  if (!Array.isArray(origins)) origins = [ originsController.origins.http() ];
 
-    if (config.userAgent && req.headers['user-agent'] !== config.userAgent) {
-      return next(errors.ArgumentError('USER_AGENT_FORBIDDEN', new Error('User Agent forbidden')));
-    }
-    if (req.params.width > config.maxWidth || req.params.height > config.maxHeight) {
-      return next(errors.ArgumentError('SRC_TOO_LARGE', new Error('Requested image too large')));
-    }
-    if (config.hostWhitelist.length && !micromatch.any(req.params.source, config.hostWhitelist)) {
-      return next(errors.ArgumentError('INVALID_SRC_URL', new Error('Invalid remote URL')));
-    }
-    if (config.hostBlacklist.length && micromatch.any(req.params.source, config.hostBlacklist)) {
-      return next(errors.ArgumentError('INVALID_SRC_URL', new Error('Invalid remote URL')));
+  recipes.forEach(recipe => {
+    if (typeof recipe.path !== 'string' || typeof recipe.recipe !== 'function') {
+      throw new Error('Missing path/recipe from recipe');
     }
 
-    if (!Array.isArray(config.rewrites) || !config.rewrites.length) {
-      if (config.rewritesOnly) return next(errors.ArgumentError('INVALID_SRC_URL', new Error('Remote URL does not match any sources')));
-    } else {
-      // Check rewrites.
-      // If one is found, modify the source param to the origin source URL.
-      let matchFound = false;
-      config.rewrites.forEach(alias => {
-        if (matchFound) return;
-        const matches = (`/${req.params.source}`).match(alias.regexp);
-        if (!matches) return;
-        matchFound = true;
-
-        req.params.source = alias.origin + matches[1];
-        if (alias.request) req.wrender.requestOpts = Object.assign({}, alias.request);
-      });
-
-      if (config.rewritesOnly && !matchFound) {
-        return next(errors.ArgumentError('INVALID_SRC_URL', new Error('Remote URL does not match any sources')));
+    origins.forEach(origin => {
+      if (typeof origin.path !== 'string' || typeof origin.origin !== 'function') {
+        throw new Error('Missing path/source from origin');
       }
-    }
 
-    req.wrender.requestOpts = req.wrender.requestOpts || {};
-    req.wrender.requestOpts.url = req.params.source;
-
-    request.fetchSourceMiddleware(req, res, next);
+      router.get(path.posix.join(recipe.path.replace(/:origin$/, ''), origin.path), [
+        handleSource(config, origin.origin),
+        handleProcessing(config, recipe.recipe),
+      ]);
+    });
   });
 
-  /**
-   * Prepare Sharp for image processing
-   */
-  middleware.push((req, res, next) => {
-    const type = imageType(readChunk.sync(req.wrender.temp.path, 0, 12)); // First 12 bytes contains the mime type header
-    if (!type) return next(errors.ArgumentError('INVALID_IMG', new Error(`Source file is not an image: ${req.originalUrl}`)));
+  router.use((req, res, next) => next(new Error(`Missing route: ${req.originalUrl}`)));
+  router.use(handleErrorRoute);
 
-    req.wrender.mimetype = type.mime;
-    req.params.quality = config.quality;
-    req.wrender.source = fs.createReadStream(req.wrender.temp.path);
-    req.wrender.source.on('error', next);
+  return router;
+}
+
+Object.assign(wrender, recipesController, originsController);
+
+function handleSource(config, origin) {
+  return (req, res, next) => {
+    req.tempfile = temp.path();
+
+    // Create a write stream to a temp path
+    const stream = fs.createWriteStream(req.tempfile);
+    stream.on('error', err => next(err));
+    stream.on('finish', () => next());
+
+    // Recursively fetch the image from the origin, pipe it to our temp file.
+    const r = origin(req.params);
+    r.on('error', err => stream.emit('error', err));
+    r.pipe(stream);
+  };
+}
+
+function handleProcessing(config, recipe) {
+  return (req, res, next) => {
+    const type = imageType(readChunk.sync(req.tempfile, 0, 12)); // First 12 bytes contains the mime type header
+    if (!type) return next(new Error(`Source file is not an image: ${req.originalUrl}`));
+
+    const source = fs.createReadStream(req.tempfile);
+    source.on('error', err => next(err));
 
     // If we are not converting GIFs we must direct proxy the image. Sharp cannot process (animated) GIFs.
-    if (!config.convertGIF && req.wrender.mimetype === 'image/gif') return next();
+    // if (!config.convertGIF && mimetype === 'image/gif') return next();
 
-    req.wrender.recipe = sharp();
-    req.wrender.recipe
-      .on('error', next)
-      .on('finish', () => fs.unlink(req.wrender.source.path));
+    const image = sharp();
+    image.on('error', err => next(err));
+    image.on('finish', () => fs.unlink(req.tempfile, () => {})); // eslint-disable-line no-empty-function
 
-    // Convert to JPEG? GIFs become still-frames
-    if (
-      req.wrender.mimetype !== 'image/jpeg' &&
-      (config.convertGIF && req.wrender.mimetype === 'image/gif') &&
-      (config.convertPNG && req.wrender.mimetype === 'image/png')
-    ) {
-      req.wrender.recipe.background({ r: 0, g: 0, b: 0, alpha: 0 });
-      req.wrender.recipe.flatten();
-      req.wrender.recipe.toFormat(sharp.format.jpeg);
-      req.wrender.mimetype = 'image/jpeg';
-    }
+    const mimetype = (({ mime }) => {
+      // Convert to JPEG? GIFs become still-frames
+      if (mime !== 'image/jpeg') {
+        const convertToJPEG = (
+          (config.convertGIF && mime === 'image/gif') ||
+          (config.convertPNG && mime === 'image/png')
+        );
 
-    // Respect EXIF orientation headers
-    if (req.wrender.mimetype === 'image/jpeg') {
-      req.wrender.recipe.rotate();
-    }
-
-    next();
-  });
-
-  /**
-   * Recipes handler
-   * All hail the standalone recipe functions!
-   */
-  config.recipes.forEach(r => {
-    if (typeof r.path !== 'string') throw new Error('Expected recipe to have a path');
-    if (r.path.indexOf('/:source') < 0) throw new Error(`Expected recipe path ${r.path} to have a source parameter`);
-    if (typeof r.recipe !== 'function') throw new Error('Expected recipe to have a function');
-
-    debugLog('Registering ' + (r.name || r.path));
-
-    router.get(r.path.replace(':source', ':source(*)'), middleware, (recipe => {
-      if (recipe.length === 3) {
-        return (req, res, next) => recipe(req.wrender.recipe, req.params, next);
-      } else {
-        return (req, res, next) => {
-          recipe(req.wrender.recipe, req.params);
-          next();
-        };
+        if (convertToJPEG) {
+          image.background({ r: 0, g: 0, b: 0, alpha: 0 });
+          image.flatten();
+          image.toFormat(sharp.format.jpeg);
+          mime = 'image/jpeg';
+        }
       }
-    })(r.recipe));
-  });
 
-  /**
-   * Response handler
-   */
-  router.use((req, res, next) => {
-    if (!req.wrender) return next(errors.NotFoundError('ROUTE_NOT_FOUND', '404 Not Found'));
+      // Respect EXIF orientation headers
+      if (mime === 'image/jpeg') {
+        image.rotate();
+      }
 
-    res.setHeader('Content-Type', req.wrender.mimetype);
-    res.setHeader('Cache-Control', `public, max-age=${config.maxAge}`);
+      return mime;
+    })(type);
 
-    // Recipe not defined, pipe the source directly to output
-    if (!req.wrender.recipe) return req.wrender.source.pipe(res);
+    res.set('Content-Type', mimetype);
+    res.set('Cache-Control', `public, max-age=${config.maxAge}`);
+
+    recipe(image, req.params);
 
     // Always apply compression at the end
-    if (req.wrender.mimetype === 'image/jpeg') {
-      req.wrender.recipe.jpeg({ quality: req.params.quality });
+    if (mimetype === 'image/jpeg') {
+      image.jpeg({ quality: config.quality || 85 });
     }
 
     // Discard EXIF
     if (config.includeEXIF === true) {
-      req.wrender.recipe.withMetadata();
+      image.withMetadata();
     }
 
     // Go!
-    req.wrender.source.pipe(req.wrender.recipe);
-    req.wrender.recipe.pipe(res);
-  });
+    source.pipe(image);
+    image.pipe(res);
+  };
+}
 
-  /**
-   * Error handler
-   */
-  // eslint-disable-next-line no-unused-vars
-  router.use((err, req, res, next) => {
-    if (req.wrender && req.wrender.source) {
-      fs.unlink(req.wrender.source.path);
-    }
+// eslint-disable-next-line max-len
+const errBlank = new Buffer('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', 'base64');
 
-    errorLog(err);
-
-    res
-      .status(err.status || 500)
-      .set({
-        'Content-Type': 'image/png',
-        'Content-Length': blank.length,
-        'X-Wrender-Error': err.message
-      })
-      .send(blank);
-  });
-
-  return router;
+const errHeaders = {
+  'Content-Type': 'image/png',
+  'Content-Length': errBlank.length,
 };
+// eslint-disable-next-line no-unused-vars
+function handleErrorRoute(err, req, res, next) {
+  if (req.tempfile) fs.unlink(req.tempfile, () => {}); // eslint-disable-line no-empty-function
+  // console.error(err);
+  res.status(err.status || 500).set(errHeaders).set('X-Wrender-Error', `${err}`).send(errBlank);
+}
 
-/**
- * Invoke a pre-defined recipe with a fixed set of parameters
- * See README.md for usage
- * Any params in the URL will override the defaults passed here
- *
- * @param {Object} recipe A recipe object (with path & recipe function)
- * @param {Object} defaults A plain object to be the parameters passed to the recipe
- * @return {Function} A recipe function
- */
-module.exports.invoke = function (recipe, defaults) {
-  if (!recipe.path || !recipe.hasOwnProperty('recipe') || typeof recipe.recipe !== 'function') {
-    throw new Error('Expected first argument to be a valid recipe object: { path: ..., recipe() {...} }');
-  }
-  if (!defaults || !Object.keys(defaults).length) {
-    throw new Error('Expected second argument to be a non-empty plain object');
-  }
-
-  if (recipe.recipe.length === 3) {
-    // If this recipe expects a callback
-    return (image, params, next) => recipe.recipe(image, Object.assign({}, defaults, params), next);
-  } else {
-    // Else this recipe does not expect a callback
-    return (image, params) => recipe.recipe(image, Object.assign({}, defaults, params));
-  }
-};
-
-module.exports.recipes = recipes;
+module.exports = wrender;
