@@ -1,23 +1,25 @@
 const debug = require('debug')('wrender:recipes');
 const sharp = require('sharp');
 
-function Recipe(path, recipe) {
-  if (typeof path !== 'string') {
+const ORIGIN_REGEX = /\/:origin$/;
+
+function Recipe(recipePath, recipeFn) {
+  if (typeof recipePath !== 'string') {
     throw new Error('Expected path to be a string');
   }
-  if (typeof recipe !== 'function') {
+  if (typeof recipeFn !== 'function') {
     throw new Error('Expected recipe to be a function');
   }
-  if (!/\/:origin$/.test(path)) {
-    throw new Error(`Expected recipe path "${path}" to end with "/:origin"`);
+  if (!ORIGIN_REGEX.test(recipePath)) {
+    throw new Error(`Expected recipe path "${recipePath}" to end with "/:origin"`);
   }
 
-  Object.defineProperty(this, 'path', { enumerable: true, value: path });
-  Object.defineProperty(this, 'recipe', { enumerable: true, value: recipe });
+  Object.defineProperty(this, 'path', { enumerable: true, value: recipePath });
+  Object.defineProperty(this, 'recipe', { enumerable: true, value: recipeFn });
 }
 
 module.exports = {
-  createRecipe: (path, recipe) => new Recipe(path, recipe),
+  createRecipe: (recipePath, recipeFn) => new Recipe(recipePath, recipeFn),
 
   invokeRecipe(recipe, image, params) {
     if (!(recipe instanceof Recipe)) throw new Error('Expected recipe to be an instance of Recipe');

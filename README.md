@@ -72,6 +72,31 @@ These are the recipes that are attached if you omit `recipes` from the config ob
   - The default path is `/crop/:width/:height/:origin`
   - Resizes the source image to the desired dimensions (maintaining aspect ratio), then performs a crop from the centre.
 
+## Origins
+
+Origins describe where the original image content is coming from. They append the path in the recipe, replacing `/:origin` with their path, and can be used to obfuscate the original source of the images.
+
+### Built-in origins
+
+If you omit `origins` from the config object you supply to *wrender*, the default HTTP origin will be used.
+
+- **HTTP**
+  - Fetch source images from an external HTTP(S) source
+  - Exposed at `wrender.origins.http()`
+  - Function taking entirely optional `opts`:
+    - `prefix` - add a prefix to the origin to avoid catch-all usage
+    - `defaults` - pass a set of default options to `request.defaults`
+    - `whitelist` - pass a whitelist in micromatch format for hostnames to allow (see examples)
+    - `blacklist` - pass a whitelist in micromatch format for hostnames to deny (see examples)
+  - The default path is `/:source`, which makes this origin act as a catch-all
+  - **If you require a query string** then you must url-encode the entire `:source`, otherwise Express will strip the query string
+- **FS**
+  - Exposed at `wrender.origins.fs()`
+  - Function taking opts
+    - `prefix` - optionally add a prefix to the origin to avoid catch-all usage
+    - `mount` - optionally define the start mount for the source, e.g. `/data`
+  - The default path is `/:source`, which makes this origin act as a catch-all
+
 ## API
 
 ```js
@@ -251,50 +276,12 @@ Ensure params in your origin paths are unique to your origin, as conflicting par
 
 #### Whitelist/blacklist HTTP origins
 
-Sometimes you might want to run your HTTP(S) origins through a whitelist/blacklist, to ensure only origins you allow (or prevent origins you disallow) from being hit by your *wrender*  instance.
+It's likely you will want to run your HTTP(S) origins through a whitelist/blacklist, to ensure only origins you allow (or prevent origins you disallow) from being hit by your *wrender*  instance. This is supported by default, and the micromatch syntax is supported:
 
 ```js
-const micromatch = require('micromatch');
-const request = require('request');
-const url = require('url');
-
-function createHTTPOriginWithBlacklist(opts) {
-  if (typeof opts === 'string') opts = { prefix: opts };
-  opts = opts || {};
-
-  const req = request.defaults(Object.assign({}, opts.defaults || {}, { followRedirect: false }));
-
-  const isBlacklisted = (({ whitelist, blacklist }) => {
-    if (Array.isArray(whitelist) && whitelist.length) {
-      return source => !micromatch.any(url.parse(source).hostname, whitelist);
-    }
-    else if (Array.isArray(blacklist) && blacklist.length) {
-      return source => micromatch.any(url.parse(source).hostname, blacklist);
-    }
-    else {
-      return () => false;
-    }
-  })(opts);
-
-  return wrender.createOrigin(`${opts.prefix || ''}/:source(*)`, function makeRequest({ source }, callback) {
-    if (isBlacklisted(source)) return callback(new Error(`${source} is not a valid remote URL`));
-
-    const stream = req(source);
-    stream.on('response', res => {
-      if (res.statusCode >= 301 && res.statusCode <= 303 && res.headers.location) {
-        makeRequest({ source: res.headers.location }, callback);
-      } else if (res.statusCode !== 200 && res.statusCode !== 304) {
-        callback(new Error(`${res.statusCode} response from ${source}`));
-      } else {
-        callback(null, stream);
-      }
-    });
-  });
-}
-
 app.use('/images', wrender({
   origins: [
-    createHTTPOriginWithBlacklist({
+    wrender.origins.http({
       // Only allow specified image hosts - uses micromatch syntax
       whitelist: [ '**.giphy.com/**', 's3.amazonaws.com' ],
       // Or blacklist specific image hosts - again, micromatch syntax
@@ -311,8 +298,6 @@ app.use('/images', wrender({
 //   => Hasn't got a chance, since it's not in the whitelist, and irrelevantly isn't in the blacklist
 //   => In this example, you would need to remove the whitelist array in order to only use the blacklist
 ```
-
-We don't implement this, but as you can see from above it's relatively straightforward since `createOrigin` allows asynchronous functions.
 
 #### Private S3 Buckets
 
@@ -355,7 +340,7 @@ This is also a good example for using custom origins to rewrite URLs.
 
 - [x] Pluggable recipes
 - [x] Pluggable origins
-- [x] ~~HTTP origin: Blacklist/whitelist~~
+- [x] HTTP origin: Blacklist/whitelist
 - [x] HTTP orign: Redirects, basic auth
 - [x] HTTP origin: support for TLS requests
 - [ ] Dockerfile

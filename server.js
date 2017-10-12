@@ -15,12 +15,10 @@ app.use(wrender({
     }),
   ]),
   origins: [
-    wrender.createOrigin('/fb/:profile_id', ({ profile_id }) => {
-      return request({
-        url: util.format('https://graph.facebook.com/%d/picture', profile_id),
-        qs: { width: 1024, height: 1024 },
-      });
-    }),
+    wrender.createOrigin('/fb/:profile_id', ({ profile_id }) => request({
+      url: util.format('https://graph.facebook.com/%d/picture', profile_id),
+      qs: { width: 1024, height: 1024 },
+    })),
     wrender.origins.fs('/fs'),
     wrender.origins.http(),
   ],

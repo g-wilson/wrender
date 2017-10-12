@@ -26,8 +26,8 @@ module.exports = function handleSource(config, origin) {
     stream.on('finish', () => next());
 
     if (origin.length === 2) {
-      origin(req.params, (err, source) => {
-        if (err) return stream.emit('error', err);
+      origin(req.params, (oerr, source) => {
+        if (oerr) return stream.emit('error', oerr);
 
         source.on('error', err => stream.emit('error', err));
         source.pipe(stream);

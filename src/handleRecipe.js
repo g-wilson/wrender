@@ -61,4 +61,4 @@ module.exports = function handleProcessing(config, recipe) {
     source.pipe(image);
     image.pipe(res);
   };
-}
+};

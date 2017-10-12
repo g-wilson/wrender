@@ -38,8 +38,7 @@
   ],
   "files": [
     "index.js",
-    "lib",
-    "recipes"
+    "src"
   ],
   "repository": {
     "type": "git",
@@ -52,6 +51,7 @@
   "dependencies": {
     "express": "^4.14.0",
     "image-type": "^3.0.0",
+    "micromatch": "^3.1.0",
     "read-chunk": "^2.0.0",
     "request": "^2.79.0",
     "sharp": "^0.17.1",
@@ -63,7 +63,6 @@
     "eslint-plugin-mocha": "^4.11.0",
     "image-size": "^0.5.1",
     "istanbul": "^0.4.5",
-    "micromatch": "^3.1.0",
     "mocha": "^3.2.0",
     "morgan": "^1.9.0",
     "nock": "^9.0.2",
