@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const request = require('request');
 const util = require('util');
 const wrender = require('./index');
@@ -19,8 +20,13 @@ app.use(wrender({
       url: util.format('https://graph.facebook.com/%d/picture', profile_id),
       qs: { width: 1024, height: 1024 },
     })),
-    wrender.origins.fs('/fs'),
-    wrender.origins.http(),
+    wrender.origins.fs({
+      prefix: '/fs',
+      mount: path.join(__dirname, 'tests/fixtures'),
+    }),
+    wrender.origins.http({
+      blacklist: [ 'hack.thepla.net' ],
+    }),
   ],
 }));
 

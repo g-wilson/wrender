@@ -262,15 +262,13 @@ Origins are created using the `wrender.createOrigin` method with the following a
 ```js
 wrender.createOrigin(path, handler)
 // Where `path` is a string defining the last part of the mount point
-// Where `handler` is a synchronous function, with the arguments (params)
-// Or `handler` can be an asynchronous function with the arguments (params, callback)
+// Where `handler` is a function, optionally async, with the arguments (params)
 //   `params` is the req.params, which contain the variables in the route that you set with `path`
-//   `callback` is your familiar node callback (err, stream)
 ```
 
 Ensure params in your origin paths are unique to your origin, as conflicting params with recipes will lead to unexpected behaviours. For example, a recipe with `/resize/:width/:height/:origin` and an origin with `/fb/:width/:profile_id` will lead to `/resize/:width/:height/fb/:width/:profile_id`. Not good!
 
-`handler` expects [a readable stream](https://nodejs.org/api/stream.html#stream_readable_streams) to be returned, either by returning (synchronously) or by a callback (asynchronously), ready to be piped into a temporary file & transformed by the recipe.
+`handler` expects [a readable stream](https://nodejs.org/api/stream.html#stream_readable_streams) to be returned. Origin functions can be async, allowing you to perform (hopefully) simple async operations, to a database or an external source.
 
 ### Origin examples
 
@@ -335,6 +333,28 @@ app.use('/images', wrender({
 ```
 
 This is also a good example for using custom origins to rewrite URLs.
+
+#### Lookup image data from a model
+
+```js
+const AWS = require('aws-sdk');
+const images = require('../models/images');
+const s3 = new AWS.S3({ region: 'us-east-1' });
+
+app.use('/images', wrender({
+  origins: [
+    wrender.createOrigin('/users/:image_id', async ({ image_id }) => {
+      const { bucket, key } = await images.findById(image_id);
+      return s3.getObject({ Bucket: bucket, Key: key }).createReadStream();
+    }),
+  ],
+}));
+
+// => /images/resize/200/200/users/9ff4a3cf5fe1a735ec96f142a2081f3e
+//   => s3://user-uploads.someimportantcompany.com/profiles/9ff4a3cf5fe1a735ec96f142a2081f3e.jpg
+```
+
+Hopefully, `images.findById` will be nicely cached or easy to pull up.
 
 ## Roadmap
 

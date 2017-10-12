@@ -2,6 +2,7 @@ const debug = require('debug')('wrender:origins');
 const fs = require('fs');
 const micromatch = require('micromatch');
 const path = require('path');
+const promisify = require('./promisify');
 const request = require('request');
 const url = require('url');
 
@@ -51,23 +52,31 @@ module.exports = {
       })(opts);
 
       if (isBlacklisted) {
-        return new Origin(`${opts.prefix || ''}/:source(*)`, function makeRequest({ source }, callback) {
-          if (isBlacklisted(source)) return callback(new Error(`${source} is not a valid remote URL`));
+        return new Origin(`${opts.prefix || ''}/:source(*)`, async ({ source }) => {
+          await promisify(function makeRequest(callback) {
+            if (isBlacklisted(source)) throw new Error(`${source} is not a valid remote URL`);
 
-          const stream = req(source);
-          stream.on('response', res => {
-            if (res.statusCode >= 301 && res.statusCode <= 303 && res.headers.location) {
-              makeRequest({ source: res.headers.location }, callback);
-            } else if (res.statusCode !== 200 && res.statusCode !== 304) {
-              callback(new Error(`${res.statusCode} response from ${source}`));
-            } else {
-              callback(null, stream);
-            }
+            debug(`HTTP HEAD: ${source}`);
+            request.head(source, (err, res) => {
+              if (err) {
+                callback(err);
+              } else if (res.statusCode >= 301 && res.statusCode <= 303 && res.headers.location) {
+                source = res.headers.location;
+                makeRequest(callback);
+              } else if (res.statusCode !== 200 && res.statusCode !== 304) {
+                callback(new Error(`${res.statusCode} response from ${source}`));
+              } else {
+                callback();
+              }
+            });
           });
+
+          debug(`HTTP GET: ${source}`);
+          return req(source);
         });
       } else {
         return new Origin(`${opts.prefix || ''}/:source(*)`, ({ source }) => {
-          debug(`HTTP origin: ${source}`);
+          debug(`HTTP GET: ${source}`);
           return req(source);
         });
       }

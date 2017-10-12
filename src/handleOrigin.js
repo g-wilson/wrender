@@ -18,6 +18,7 @@ module.exports = function handleSource(config, origin) {
       }
     }
 
+    // Attach a temp path to the req
     req.tempfile = temp.path(tempOpts);
 
     // Create a write stream to a temp path
@@ -25,17 +26,12 @@ module.exports = function handleSource(config, origin) {
     stream.on('error', err => next(err));
     stream.on('finish', () => next());
 
-    if (origin.length === 2) {
-      origin(req.params, (oerr, source) => {
-        if (oerr) return stream.emit('error', oerr);
-
+    Promise.resolve()
+      .then(async () => {
+        const source = await origin(req.params);
         source.on('error', err => stream.emit('error', err));
         source.pipe(stream);
-      });
-    } else if (origin.length === 1) {
-      const source = origin(req.params);
-      source.on('error', err => stream.emit('error', err));
-      source.pipe(stream);
-    }
+      })
+      .catch(err => stream.emit('error', err));
   };
 };

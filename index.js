@@ -1,6 +1,7 @@
 const express = require('express');
 const fs = require('fs');
 
+const errors = require('./src/errors');
 const originsController = require('./src/origins');
 const recipesController = require('./src/recipes');
 const handleOrigin = require('./src/handleOrigin');
@@ -32,7 +33,11 @@ function wrender(config) {
     });
   });
 
-  router.use((req, res, next) => next(new Error(`Missing route: ${req.originalUrl}`)));
+  router.use((req, res, next) => next(errors({
+    err: new Error(`Missing route: ${req.originalUrl}`),
+    name: 'NotFoundError',
+    status: 404,
+  })));
   router.use(handleErrorRoute);
 
   return router;
