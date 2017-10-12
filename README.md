@@ -1,5 +1,8 @@
 # Wrender
 
+[![NPM](https://badge.fury.io/js/wrender.svg)](https://www.npmjs.com/package/wrender)
+[![CircleCI](https://circleci.com/gh/g-wilson/wrender/tree/master.svg?style=shield)](https://circleci.com/gh/g-wilson/wrender)
+
 Image compression and transformation reverse-proxy for Express apps.
 
 ----
@@ -356,6 +359,13 @@ app.use('/images', wrender({
 
 Hopefully, `images.findById` will be nicely cached or easy to pull up.
 
+## Docker
+
+```sh
+$ docker build -t g-wilson/wrender:dev .
+$ docker run -it -p 3010:3010 g-wilson/wrender:dev
+```
+
 ## Roadmap
 
 - [x] Pluggable recipes
@@ -363,7 +373,7 @@ Hopefully, `images.findById` will be nicely cached or easy to pull up.
 - [x] HTTP origin: Blacklist/whitelist
 - [x] HTTP orign: Redirects, basic auth
 - [x] HTTP origin: support for TLS requests
-- [ ] Dockerfile
+- [x] Dockerfile
 - [ ] Integration tests
 - [ ] CI
 - [x] Origin: Private S3 buckets using IAM

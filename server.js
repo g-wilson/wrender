@@ -1,10 +1,13 @@
 const express = require('express');
+const http = require('http');
 const path = require('path');
 const request = require('request');
 const util = require('util');
 const wrender = require('./index');
 
 const app = express();
+const server = http.createServer(app);
+
 app.get('/favicon.ico', (req, res) => res.sendStatus(204));
 app.use(require('morgan')('tiny'));
 
@@ -30,5 +33,28 @@ app.use(wrender({
   ],
 }));
 
-// eslint-disable-next-line no-console
-app.listen(3010, 'localhost', () => console.log('Server started on port 3010 😎'));
+server.on('error', err => {
+  if (err.syscall === 'listen') switch (err.code) {
+    case 'EACCES':
+      err.message = `Port ${config.http.port} requires elevated privileges`;
+      break;
+    case 'EADDRINUSE':
+      err.message = `Port ${config.http.port} is already in use`;
+      break;
+  }
+  throw err;
+});
+
+server.on('listening', () => {
+  const { address, port } = server.address();
+  console.log('Server started on http://%s:%d 😎', address, port); // eslint-disable-line no-console
+});
+
+process.on('SIGINT', () => process.exit(0));
+
+process.once('uncaughtException', err => {
+  console.error(err); // eslint-disable-line no-console
+  process.exit(1);
+});
+
+server.listen(3010, '0.0.0.0');
