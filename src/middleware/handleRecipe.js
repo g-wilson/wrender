@@ -9,8 +9,6 @@ module.exports = function handleProcessing(config, recipe) {
     const type = imageType(readChunk.sync(req.tempfile, 0, 12)); // First 12 bytes contains the mime type header
     if (!type) return next(errors({ message: `Source file is not an image: ${req.originalUrl}`, status: 404 }));
 
-    res.set('Cache-Control', `public, max-age=${config.maxAge}`);
-
     const source = fs.createReadStream(req.tempfile);
     source.on('error', err => next(err));
 
@@ -22,6 +20,7 @@ module.exports = function handleProcessing(config, recipe) {
       mimetype: type.mime,
       quality: config.quality,
       includeEXIF: config.includeEXIF,
+      cacheAge: config.maxAge,
       convertToJPEG: (
         (config.convertGIF && type.mime === 'image/gif') ||
         (config.convertPNG && type.mime === 'image/png')

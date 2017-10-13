@@ -46,6 +46,7 @@ class Recipe {
       image.withMetadata();
     }
 
+    res.set('Cache-Control', `public, max-age=${params.cacheAge}`);
     res.set('Content-Type', params.mimetype);
     image.pipe(res);
   }
