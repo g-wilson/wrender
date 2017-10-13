@@ -3,7 +3,7 @@ const micromatch = require('micromatch');
 const request = require('request');
 const url = require('url');
 const promisify = require('../promisify');
-const originController = require('../origins');
+const originController = require('../lib/origin');
 
 module.exports = function httpOrigin(opts) {
   if (typeof opts === 'string') opts = { prefix: opts };

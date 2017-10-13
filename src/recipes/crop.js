@@ -1,6 +1,6 @@
 const debug = require('debug')('wrender:recipes');
 const sharp = require('sharp');
-const recipeController = require('../recipes');
+const recipeController = require('../lib/recipe');
 
 module.exports = recipeController.createRecipe('/crop/:width/:height/:origin', (image, { width, height }) => {
   debug('Crop recipe', { width, height });

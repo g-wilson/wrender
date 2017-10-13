@@ -1,7 +1,7 @@
 const debug = require('debug')('wrender:origins');
 const fs = require('fs');
 const path = require('path');
-const originController = require('../origins');
+const originController = require('../lib/origin');
 
 module.exports = function fsOrigin(opts) {
   if (typeof opts === 'string') opts = { prefix: opts };

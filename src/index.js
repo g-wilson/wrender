@@ -1,8 +1,8 @@
 const express = require('express');
 
 const errors = require('./errors');
-const originsController = require('./origins');
-const recipesController = require('./recipes');
+const originsController = require('./lib/origin');
+const recipesController = require('./lib/recipe');
 const handleOrigin = require('./middleware/handleOrigin');
 const handleRecipe = require('./middleware/handleRecipe');
 const handleError = require('./middleware/handleError');
