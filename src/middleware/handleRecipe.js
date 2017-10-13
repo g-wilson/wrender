@@ -2,7 +2,7 @@ const fs = require('fs');
 const sharp = require('sharp');
 const imageType = require('image-type');
 const readChunk = require('read-chunk');
-const errors = require('../errors');
+const errors = require('../lib/errors');
 
 module.exports = function handleProcessing(config, recipe) {
   return (req, res, next) => {

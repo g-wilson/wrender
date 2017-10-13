@@ -1,5 +1,6 @@
 const fs = require('fs');
 const temp = require('temp');
+const errors = require('../lib/errors');
 
 module.exports = function handleSource(config, origin) {
   if (config.userAgent || Array.isArray(config.userAgent)) config.userAgent = [ config.userAgent ];
@@ -9,12 +10,12 @@ module.exports = function handleSource(config, origin) {
 
   return (req, res, next) => {
     if (config.userAgent && config.userAgent.indexOf(req.get('user-agent')) < 0) {
-      return next(new Error('User Agent forbidden'));
+      return next(errors({ message: 'User Agent forbidden', status: 403 }));
     }
 
     if (config.maxWidth || config.maxHeight) {
       if (req.params.width > config.maxWidth || req.params.height > config.maxHeight) {
-        return next(new Error('Requested image too large'));
+        return next(errors({ message: 'Requested image too large', status: 400 }));
       }
     }
 

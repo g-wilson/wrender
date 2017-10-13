@@ -2,7 +2,7 @@ const debug = require('debug')('wrender:origins');
 const micromatch = require('micromatch');
 const request = require('request');
 const url = require('url');
-const promisify = require('../promisify');
+const promisify = require('../lib/promisify');
 const originController = require('../lib/origin');
 
 module.exports = function httpOrigin(opts) {
