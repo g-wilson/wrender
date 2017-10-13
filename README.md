@@ -3,17 +3,19 @@
 [![NPM](https://badge.fury.io/js/wrender.svg)](https://www.npmjs.com/package/wrender)
 [![CircleCI](https://circleci.com/gh/g-wilson/wrender/tree/master.svg?style=shield)](https://circleci.com/gh/g-wilson/wrender)
 
-Image compression and transformation reverse-proxy for Express apps.
+High-performance image compression and transformation reverse-proxy for Node.js web servers.
 
 ----
 
-This library can be used to serve up compressed and transformed images from a high-resolution origin (e.g. Amazon S3) suitable for caching and delivery by a CDN.
+This _library_ can be used to serve up compressed and transformed images from a high-resolution origin (e.g. Amazon S3) suitable for caching and delivery by a CDN.
+
+It provides features comparable to [Imgix](https://www.imgix.com/) and [Cloudinary](https://cloudinary.com/) for environments where you want much more customisation for how you source and handle your images. You will of course need your own CDN!
 
 It is an open-source re-implementation of [Car Throttle](https://www.carthrottle.com/about/)'s image delivery service, which (running behind Cloudfront) handles hundreds of GBs and tens of millions of requests every day.
 
 The image processing is extremely fast and is handled by [Sharp](https://github.com/lovell/sharp), which implements the [libvips](https://github.com/jcupitt/libvips) library as a native module. As such, Node.js [Streams](https://nodejs.org/api/stream.html) are used to abstract the handling of image data.
 
-The recommended usage is part of a larger [express](https://expressjs.com)-based application although a simple server is provided for example, testing and non-production environments. Rate-limiting, authentication, logging, and other such features are best implemented alongside with relevant packages and therefore are not provided here, although we do present a few examples to better demonstrate certain use-cases.
+The recommended usage is part of a larger [express](https://expressjs.com)-based (or Restify!) application although a simple server is provided for example, testing and non-production environments. Rate-limiting, authentication, logging, and other such features are best implemented alongside with relevant packages and therefore are not provided here, although we do present a few examples to better demonstrate certain use-cases.
 
 ## Compression Defaults
 
@@ -240,7 +242,7 @@ wrender.createRecipe('/mirror/:origin', image => {
 This recipe will resize the image using the built-in resize recipe, to 200x200, then flop the image about the horizontal X axis, as [discussed in the Sharp API operation docs](http://sharp.dimens.io/en/stable/api-operation/#flop).
 
 ```js
-wrender.createRecipe('/thumbnail/:source', image => wrender.invoke(wrender.recipes.resize, image, { width: 150 }))
+wrender.createRecipe('/thumbnail/:source', image => wrender.invokeRecipe(wrender.recipes.resize, image, { width: 150 }))
 ```
 
 By using `wrender.invokeRecipe(recipe, image, [params])` you can call existing recipes with pre-defined values. This is useful if you wish to hide options from the URLs to prevent undesired costs or DoS attacks:

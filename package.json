@@ -6,10 +6,8 @@
   "scripts": {
     "dev": "nodemon server.js",
     "lint": "eslint .",
-    "pretest": "npm run test-artifacts-reset",
-    "posttest": "istanbul check-coverage",
-    "test": "istanbul cover _mocha -- tests/*.test.js tests/**/*.test.js",
-    "test-artifacts-reset": "rm -rf tests/artifacts && mkdir tests/artifacts"
+    "test": "nyc mocha -- tests/*.test.js tests/**/*.test.js",
+    "start": "node server"
   },
   "keywords": [
     "image",
@@ -49,25 +47,26 @@
   },
   "license": "MIT",
   "dependencies": {
-    "express": "^4.14.0",
+    "express": "^4.16.2",
     "image-type": "^3.0.0",
     "micromatch": "^3.1.0",
-    "read-chunk": "^2.0.0",
-    "request": "^2.79.0",
+    "read-chunk": "^2.1.0",
+    "request": "^2.83.0",
     "sharp": "^0.17.1",
     "temp": "^0.8.3"
   },
   "devDependencies": {
-    "debug": "^2.6.9",
+    "debug": "^3.1.0",
     "eslint": "^4.8.0",
     "eslint-plugin-mocha": "^4.11.0",
-    "image-size": "^0.5.1",
-    "istanbul": "^0.4.5",
-    "mocha": "^3.2.0",
+    "image-size": "^0.6.1",
+    "mocha": "^4.0.1",
     "morgan": "^1.9.0",
-    "nock": "^9.0.2",
+    "nock": "^9.0.22",
     "nodemon": "^1.12.1",
-    "serve-static": "^1.11.2",
+    "nyc": "^11.2.1",
+    "restify": "^6.0.1",
+    "serve-static": "^1.13.1",
     "supertest": "^3.0.0"
   },
   "engines": {

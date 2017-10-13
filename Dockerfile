@@ -1,5 +1,5 @@
 FROM node:8
-MAINTAINER Car Throttle <dev@carthrottle.com> (https://carthrottle.io/)
+MAINTAINER George Wilson <george@g-wilson.co.uk>
 
 # Fetch dumb-init
 ADD https://github.com/Yelp/dumb-init/releases/download/v1.1.1/dumb-init_1.1.1_amd64 /usr/local/bin/dumb-init

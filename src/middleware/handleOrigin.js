@@ -26,9 +26,10 @@ module.exports = function handleSource(config, origin) {
     stream.on('error', err => next(err));
     stream.on('finish', () => next());
 
+    // origin.fetch could be sync or return a promise - we can handle both
     Promise.resolve()
       .then(async () => {
-        const source = await origin(req.params);
+        const source = await origin.fetch(req.params);
         source.on('error', err => stream.emit('error', err));
         source.pipe(stream);
       })

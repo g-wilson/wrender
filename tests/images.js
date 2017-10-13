@@ -8,11 +8,6 @@ const path = require('path');
 const serveStatic = require('serve-static');
 const sharp = require('sharp');
 
-images.assertHeaders = function ({ headers }) {
-  assert.equal(headers['content-type'], 'image/png');
-  assert.equal(headers['x-wrender-error'], undefined);
-};
-
 images.createExpressApp = function (route) {
   const app = express();
   app.use(route);
@@ -30,7 +25,7 @@ images.getFixturesPath = function (file) {
 images.run = function (opts, callback) {
   // Confirm our inputs to this function are sane
   assert.equal(typeof opts, 'object', 'Expected opts to be an object');
-  if (opts.recipe && opts.recipe.path && opts.recipe.recipe) opts.recipe = opts.recipe.recipe
+  if (opts.recipe && opts.recipe.path && opts.recipe.process) opts.recipe = opts.recipe.process;
   assert.equal(typeof opts.recipe, 'function', 'Expected opts.recipe to be a function');
   assert.equal(typeof opts.source, 'string', 'Expected opts.source to be a string');
   assert.equal(typeof opts.dest, 'string', 'Expected opts.dest to be a string');
