@@ -1,5 +1,4 @@
 const ORIGIN_REGEX = /\/:origin$/;
-const sharp = require('sharp');
 
 class Recipe {
 
@@ -16,39 +15,6 @@ class Recipe {
 
     Object.defineProperty(this, 'path', { enumerable: true, value: recipePath });
     Object.defineProperty(this, 'process', { enumerable: true, value: processFn });
-  }
-
-  pipeline(image, params, res) {
-
-    // Convert to JPEG? GIFs become still-frames
-    if (params.mimetype !== 'image/jpeg' && params.convertToJPEG) {
-      params.mimetype = 'image/jpeg';
-      image.background({ r: 0, g: 0, b: 0, alpha: 0 });
-      image.flatten();
-      image.toFormat(sharp.format.jpeg);
-    }
-
-    // Respect EXIF orientation headers
-    if (params.mimetype === 'image/jpeg') {
-      image.rotate();
-    }
-
-    // Apply recipe
-    this.process(image, params);
-
-    // Always apply compression at the end
-    if (params.mimetype === 'image/jpeg') {
-      image.jpeg({ quality: params.quality || 85 });
-    }
-
-    // Discard EXIF
-    if (params.includeEXIF === true) {
-      image.withMetadata();
-    }
-
-    res.set('Cache-Control', `public, max-age=${params.cacheAge}`);
-    res.set('Content-Type', params.mimetype);
-    image.pipe(res);
   }
 
 }
