@@ -25,7 +25,7 @@ module.exports = {
 
   invokeRecipe(recipe, image, params) {
     if (!(recipe instanceof Recipe)) throw new Error('Expected recipe to be an instance of Recipe');
-    recipe.recipe(image, params);
+    recipe.process(image, params);
   },
 
   instanceofRecipe: input => input instanceof Recipe,

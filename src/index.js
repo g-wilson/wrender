@@ -7,16 +7,16 @@ const handleOrigin = require('./middleware/handleOrigin');
 const handleRecipe = require('./middleware/handleRecipe');
 const handleError = require('./middleware/handleError');
 
-const builtinOrigins = [
-  require('./origins/http'),
-  require('./origins/fs'),
-];
+const builtinOrigins = {
+  http: require('./origins/http'),
+  fs: require('./origins/fs'),
+};
 
-const builtinRecipes = [
-  require('./recipes/crop'),
-  require('./recipes/resize'),
-  require('./recipes/proxy'),
-];
+const builtinRecipes = {
+  crop: require('./recipes/crop'),
+  resize: require('./recipes/resize'),
+  proxy: require('./recipes/proxy'),
+};
 
 /**
  * Main function:
@@ -39,10 +39,10 @@ function wrender(config = {}) {
   const router = express.Router();
 
   // Ensure there is a list of recipes
-  if (!Array.isArray(recipes)) recipes = builtinRecipes;
+  if (!Array.isArray(recipes)) recipes = Object.values(builtinRecipes);
 
   // Ensure there is a list of origins
-  if (!Array.isArray(origins)) origins = [ builtinOrigins[0]() ];
+  if (!Array.isArray(origins)) origins = [ builtinOrigins.http() ];
 
   // Mount each recipe
   recipes.forEach(recipe => {
