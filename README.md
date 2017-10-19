@@ -1,44 +1,23 @@
 # Wrender
 
-Image compression and transformation reverse-proxy for Express apps.
+[![NPM](https://badge.fury.io/js/wrender.svg)](https://www.npmjs.com/package/wrender)
+[![CircleCI](https://circleci.com/gh/g-wilson/wrender/tree/master.svg?style=shield)](https://circleci.com/gh/g-wilson/wrender)
+
+High-performance image compression and transformation reverse-proxy for Node.js web servers.
 
 ----
 
-This library can be used to serve up compressed and transformed images from a high-resolution source (e.g. Amazon S3) suitable for caching and delivery by a CDN.
+This _library_ can be used to serve up compressed and transformed images from a high-resolution origin (e.g. Amazon S3) suitable for caching and delivery by a CDN.
+
+It provides features comparable to [Imgix](https://www.imgix.com/) and [Cloudinary](https://cloudinary.com/) for environments where you want much more customisation for how you source and handle your images. You will of course need your own CDN!
 
 It is an open-source re-implementation of [Car Throttle](https://www.carthrottle.com/about/)'s image delivery service, which (running behind Cloudfront) handles hundreds of GBs and tens of millions of requests every day.
 
 The image processing is extremely fast and is handled by [Sharp](https://github.com/lovell/sharp), which implements the [libvips](https://github.com/jcupitt/libvips) library as a native module. As such, Node.js [Streams](https://nodejs.org/api/stream.html) are used to abstract the handling of image data.
 
-The recommended usage is part of a larger express-based application although a simple server is provided for example, testing and non-production environments. Rate-limiting, authentication, logging, and other such features can be implemented alongside and are not provided here.
+The recommended usage is part of a larger [express](https://expressjs.com)-based (or Restify!) application although a simple server is provided for example, testing and non-production environments. Rate-limiting, authentication, logging, and other such features are best implemented alongside with relevant packages and therefore are not provided here, although we do present a few examples to better demonstrate certain use-cases.
 
-```js
-const express = require('express');
-const wrender = require('wrender');
-
-const app = express();
-app.use('/images', wrender());
-```
-
-----
-
-### Roadmap
-
-- [x] Rewrites ("route aliases")
-- [x] Proxy origin: Blacklist/whitelist
-- [x] Proxy orign: Redirects, basic auth
-- [x] Pluggable recipes
-- [ ] Pluggable origins
-- [ ] Proxy origin: support for TLS requests
-- [ ] Dockerfile
-- [ ] Integration tests
-- [ ] CI
-- [ ] Origin: Private S3 buckets using IAM
-- [ ] Recipe: Watermark/overlay
-
-----
-
-### Compression Defaults
+## Compression Defaults
 
 - All images are converted to JPEG and compressed at quality level 85.
 
@@ -52,14 +31,83 @@ app.use('/images', wrender());
 
 - Source images larger than 3000px in each dimension are not transformed and an error response is sent.
 
-### Usage
+## Usage
 
 ```js
-
+const express = require('express');
 const wrender = require('wrender');
 
-// Available options, all totally optional
-const options = {
+const app = express();
+
+const instance = wrender({
+  quality: 90,
+  maxAge: 86400,
+});
+
+app.use('/images', instance);
+```
+
+For a complete example with full configuration object and defaults, see below.
+
+## Recipes
+
+Different strategies for image handling are defined as the first parameter of the URL path. All recipe paths contain `/:origin`, which refers to the specific origin the client wishes to use. Failure to end your recipe with `/:origin` will result in an error being thrown, so ideally you should configure recipes on boot. For example, a recipe of `/hello/:origin` would match:
+
+```
+/hello/https://static.carthrottle.com/workspace/uploads/articles/dsc_6267-56ead06f7fda8.jpg
+# Note the protocol, that's important to allow HTTPS origins
+# If the origin contains a query string, you must encode the URL first:
+`/hello/http%3A%2F%2Fstatic.carthrottle.com%2Fworkspace%2Fuploads%2Farticles%2F%3Ffilename%3Ddsc_6267-56ead06f7fda8.jpg`
+```
+
+### Built-in recipes
+
+These are the recipes that are attached if you omit `recipes` from the config object you supply to `wrender`.
+
+- **Proxy**
+  - Exposed at `wrender.recipes.proxy`
+  - The default path is `/proxy/:origin`
+  - Applies compression to the source image, but no other transformations.
+- **Resize**
+  - Exposed at `wrender.recipes.resize`
+  - The default path is `/resize/:width/:height/:origin`
+  - You can also resize by `:width` or `:height`, whilst maintaining the aspect ratio, by setting either `:width` or `:height` to `0`.
+- **Crop**
+  - Exposed at `wrender.recipes.crop`
+  - The default path is `/crop/:width/:height/:origin`
+  - Resizes the source image to the desired dimensions (maintaining aspect ratio), then performs a crop from the centre.
+
+## Origins
+
+Origins describe where the original image content is coming from. They append the path in the recipe, replacing `/:origin` with their path, and can be used to obfuscate the original source of the images.
+
+### Built-in origins
+
+If you omit `origins` from the config object you supply to *wrender*, the default HTTP origin will be used.
+
+- **HTTP**
+  - Fetch source images from an external HTTP(S) source
+  - Exposed at `wrender.origins.http()`
+  - Function taking entirely optional `opts`:
+    - `prefix` - add a prefix to the origin to avoid catch-all usage
+    - `defaults` - pass a set of default options to `request.defaults`
+    - `whitelist` - pass a whitelist in micromatch format for hostnames to allow (see examples)
+    - `blacklist` - pass a whitelist in micromatch format for hostnames to deny (see examples)
+  - The default path is `/:source`, which makes this origin act as a catch-all
+  - **If you require a query string** then you must url-encode the entire `:source`, otherwise Express will strip the query string
+- **FS**
+  - Exposed at `wrender.origins.fs()`
+  - Function taking opts
+    - `prefix` - optionally add a prefix to the origin to avoid catch-all usage
+    - `mount` - optionally define the start mount for the source, e.g. `/data`
+  - The default path is `/:source`, which makes this origin act as a catch-all
+
+## API
+
+```js
+const wrender = require('wrender');
+
+const instance = wrender({
 
   // JPEG compression level to apply
   quality: 85, // Default
@@ -84,140 +132,284 @@ const options = {
   // Only allow specified UA
   userAgent: 'Amazon CloudFront',
 
-  // Only allow specified image hosts
-  // Uses Micromatch syntax
-  hostWhitelist: [
-    '**.giphy.com/**',
-    's3.amazonaws.com',
-  ],
-  hostBlacklist: [
-    'hack.thepla.net',
-  ],
-
-  // Only allow sources specified as rewrites below.
-  // Disables all user-specified sources regardless of whitelist/blacklist
-  rewritesOnly: false, // Default
-
-  // Optionally you can hide the source from your URLs by rewriting them on the fly.
-  // Added to the router in order.
-  rewrites: [
-    {
-      // Match path (uses "path-to-regexp" same as Express)
-      path: '/uploads/:source(.*)',
-
-      // Source URI prefix. Protocol is optional and will default to `http://`
-      origin: 'https://uploads-bucket.s3.amazonaws.com/workspace/uploads/',
-
-      // Request options
-      // https://github.com/request/request#requestoptions-callback
-      request: {
-        headers: {
-          'X-Wrender-Token': '1234abcd',
-        },
-        qs: {
-          foo: 'bar',
-        },
-        auth: {
-          'user': 'username',
-          'pass': 'password',
-          'sendImmediately': false
-        },
-      },
-    },
-
-    // Example: Facebook profile pictures
-    // This request: {wrender}/crop/100/60/fb/101203123/picture
-    // Fetches the source from: http://graph.facebook.com/101203123/picture?width=1024&height=1024
-    // And is then cropped to 100x60 as per the recipe
-    {
-      path: '/fb/:source(.*)',
-      origin: 'graph.facebook.com/',
-      qs: { width: 1024, height: 1024 },
-    },
-
-  ],
+  // Add a callback if an error if encountered
+  onError: e => { console.error(e) },
 
   // You can specify your own recipes, or use the pre-defined ones, or both!
   // Skip this property to use the default recipes
   recipes: [
     // You can pick recipes from wrender you want to use
     wrender.recipes.proxy,
+    wrender.recipes.resize,
+    wrender.recipes.crop,
 
-    // You can pick recipes from wrender and pass them default values
-    // Useful to hide options from the URLs
-    {
-      path: '/thumbnail/:source',
-      recipe: wrender.invoke(wrender.recipes.resizex, { width: 150 }),
-    },
-
-    // You can also write your own synchronous recipes
-    {
-      path: '/rotate/:angle/:source',
-      recipe(image, params) {
-        image.rotate(parseInt(params.angle, 10));
-      },
-    },
-
-    // You can also write your own asynchronous recipes
-    {
-      path: '/rotate/:angle/:source',
-      recipe(image, params, next) {
-        image.rotate(parseInt(params.angle, 10));
-        next();
-      },
-    },
+    // Or you can attach custom recipes (see documentation below)
+    wrender.createRecipe('/mirror/:origin', image => {
+      wrender.invokeRecipe(wrender.recipes.resize, image, { width: 200, height: 200 });
+      image.flop();
+    }),
   ],
 
   // If you want to use our recipes AND your own, that's easy to do too:
-  recipes: wrender.recipes.defaults.concat([
-    {
-      path: '/teeny/:source',
-      recipe: wrender.invoke(wrender.recipes.crop, { height: 100, width: 100 }),
-    }
-  ])
+  recipes: [
+    ...wrender.recipes,
+    wrender.createRecipe('/tiny/:origin', image => {
+      wrender.invokeRecipe(wrender.recipes.resize, image, { width: 100, height: 100 });
+    }),
+    wrender.createRecipe('/huge/:origin', image => {
+      wrender.invokeRecipe(wrender.recipes.resize, image, { height: 1800, width: 2560 });
+    }),
+  ]),
 
-};
+  // Specify how images can be fetched from the origin.
+  origins: [
 
-// As part of your Express app
-app.use('/images', wrender(options));
+    wrender.origins.http({
+      // Prefix the origin to allow multiple endpoints
+      prefix: '/http',
+
+      // Since the HTTP origin is based on Request, you can provide an object of defaults
+      // Underneath this will trigger `request.defaults` in an attempt to keep performance high
+      defaults: {
+        auth: { user: 'dan-kmemes-7312@hotmail.com', pass: 'correct-horse-battery-staple' },
+      },
+    }),
+
+    wrender.origins.fs({
+      // Prefix the origin as appropriate
+      prefix: '/fs',
+      // Pull data from a particular mount point
+      mount: '/data',
+    }),
+
+    // Custom origins (see documentation below)
+    wrender.createOrigin('/s3/:Bucket/:Key(*)', ({ source }) => {
+      // const s3 = new AWS.S3({ region: 'us-east-1' });
+      return s3.getObject({ Bucket, Key }).createReadStream();
+    });
+
+    // The default origin is HTTP, but without a prefix it acts as a catch-all
+    wrender.origins.http(),
+  ],
+});
+
+app.use('/images', instance);
+/**
+ * Available recipes:
+ * - /proxy/:origin
+ * - /resize/:width/:height/:origin
+ * - /crop/:width/:height/:origin
+ *
+ * Available origins:
+ * - /http/:url
+ * - /fs/:path
+ * - /s3/:Bucket/:Key
+ *
+ * All together, available routes are, noting that the instance is mounted to "/images":
+ * - /images/proxy/http/:url
+ * - /images/proxy/fs/:path
+ * - /images/proxy/s3/:Bucket/:Key
+ * - /images/resize/:width/:height/http/:url
+ * - /images/resize/:width/:height/fs/:path
+ * - /images/resize/:width/:height/s3/:Bucket/:Key
+ * - /images/crop/:width/:height/http/:url
+ * - /images/crop/:width/:height/fs/:path
+ * - /images/crop/:width/:height/s3/:Bucket/:Key
+ */
 ```
 
-----
+## Error Handling
 
-### Recipes
+If an error is caught inside wrender's route handler, a blank 1x1 PNG is served as a response along with an appropriate error code (usually 404 or perhaps 500).
 
-Different strategies for image handling are defined as the first parameter of the URL path.
+It is advised (but not required) to add a `onError` callback function to the constructor. This callback takes one argument (`error`) and is fired _after the response is sent_. You can use this callback to log errors wherever you like.
 
-`/:source` is a the path to the source image, excluding protocol. e.g. `/static.carthrottle.com/workspace/uploads/articles/dsc_6267-56ead06f7fda8.jpg`
+## Custom Recipes
 
-If the path contains a query-string, encode the path first. e.g. `"/static.carthrottle.com%2Fworkspace%2Fuploads%2Farticles%2F%3Ffilename%3Ddsc_6267-56ead06f7fda8.jpg`
+Custom recipes are designed to allow you complete customisation of how images are transformed before being served to the client, by using [the Sharp API](http://sharp.dimens.io/en/stable/api-operation).
 
-**Proxy**
+Recipes are created using the `wrender.createRecipe` method with the following arguments:
 
-`/proxy/:source`
+```js
+wrender.createRecipe(path, handler)
+// Where `path` is a string defining the first part of the mount point, ending in /:origin
+// Where `handler` is a synchronous function, with the arguments (image, params)
+//   `image` is the Sharp instance, for you to instruct the transformation
+//   `params` is the req.params, which contain the variables in the route that you set with `path`
+```
 
-Applies compression to the source image, but no other transformation.
+### Recipe examples
 
-**Resize**
+Asynchronous recipes are not supported. If you're looking to do an asynchronous operation with your recipe, consider using [the underlying `sharp` package](https://npm.im/sharp).
 
-`/resize/:width/:height/:source`
+```js
+wrender.createRecipe('/mirror/:origin', image => {
+  wrender.invokeRecipe(wrender.recipes.resize, image, { width: 200, height: 200 });
+  image.flop();
+})
+```
 
-Resizes the source image with no respect to aspect ratio.
+This recipe will resize the image using the built-in resize recipe, to 200x200, then flop the image about the horizontal X axis, as [discussed in the Sharp API operation docs](http://sharp.dimens.io/en/stable/api-operation/#flop).
 
-**Resize Width**
+```js
+wrender.createRecipe('/thumbnail/:source', image => wrender.invokeRecipe(wrender.recipes.resize, image, { width: 150 }))
+```
 
-`/resizex/:width/:source`
+By using `wrender.invokeRecipe(recipe, image, [params])` you can call existing recipes with pre-defined values. This is useful if you wish to hide options from the URLs to prevent undesired costs or DoS attacks:
 
-Resizes the source image to the desired width, maintaining aspect ratio.
+```js
+const watermark = new Buffer('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', 'base64');
 
-**Resize Height**
+wrender.createRecipe('/watermark/:origin', image => {
+  wrender.invokeRecipe(wrender.recipes.resize, image, { width: 200, height: 200 });
+  image.overlayWith(watermark, { gravity: 'northeast', top: 0 });
+})
+```
 
-`/resizey/:height/:source`
+Following [the overlayWith docs](http://sharp.dimens.io/en/stable/api-composite/#overlaywith), we can see how we would implement a watermark recipe.
 
-Resizes the source image to the desired height, maintaining aspect ratio.
+## Custom Origins
 
-**Crop**
+Not every use-case involves fetching information from a public-facing image endpoint. Therefore *wrender* support custom origins, which can also be used to obfuscate the source of your images.
 
-`/crop/:width/:height/:source`
+Origins are created using the `wrender.createOrigin` method with the following arguments:
 
-Resizes the source image to the desired dimensions (maintaining aspect ratio), then performs a crop from the centre.
+```js
+wrender.createOrigin(path, handler)
+// Where `path` is a string defining the last part of the mount point
+// Where `handler` is a function, optionally async, with the arguments (params)
+//   `params` is the req.params, which contain the variables in the route that you set with `path`
+```
+
+Ensure params in your origin paths are unique to your origin, as conflicting params with recipes will lead to unexpected behaviours. For example, a recipe with `/resize/:width/:height/:origin` and an origin with `/fb/:width/:profile_id` will lead to `/resize/:width/:height/fb/:width/:profile_id`. Not good!
+
+`handler` expects [a readable stream](https://nodejs.org/api/stream.html#stream_readable_streams) to be returned. Origin functions can be async, allowing you to perform (hopefully) simple async operations, to a database or an external source.
+
+### Origin examples
+
+#### Whitelist/blacklist HTTP origins
+
+It's likely you will want to run your HTTP(S) origins through a whitelist/blacklist, to ensure only origins you allow (or prevent origins you disallow) from being hit by your *wrender*  instance. This is supported by default, and the micromatch syntax is supported:
+
+```js
+app.use('/images', wrender({
+  origins: [
+    wrender.origins.http({
+      // Only allow specified image hosts - uses micromatch syntax
+      whitelist: [ '**.giphy.com/**', 's3.amazonaws.com' ],
+      // Or blacklist specific image hosts - again, micromatch syntax
+      blacklist: [ 'hack.thepla.net' ],
+    }),
+  ],
+}));
+
+// => /images/proxy/https://s3.amazonaws.com/user-uploads.someimportantcompany.com/profiles/1505c30c51bb93545db48919b3cce7f9.jpg
+//   => Will succeed, since s3.amazonaws.com is in the whitelist
+// => /images/proxy/https://i.imgur.com/cl4Bu.gif
+//   => Will fail, since i.imgur.com isn't in the whitelist
+// => /images/proxy/https://hack.thepla.net/evilcorp.exe
+//   => Hasn't got a chance, since it's not in the whitelist, and irrelevantly isn't in the blacklist
+//   => In this example, you would need to remove the whitelist array in order to only use the blacklist
+```
+
+#### Private S3 Buckets
+
+```js
+const wrender = require('wrender');
+const AWS = require('aws-sdk');
+
+const s3 = new AWS.S3({ region, secretAccessKey, accessKeyId }); // Load these from environment variables
+
+module.exports = wrender.createOrigin('/s3/:Bucket/:Key(*)', ({ Bucket, Key }) => {
+  return s3.getObject({ Bucket, Key }).createReadStream()
+});
+
+// => /images/proxy/s3/user-uploads.someimportantcompany.com/profiles/1505c30c51bb93545db48919b3cce7f9.jpg
+//   => Streams from S3, as long as the s3 instance has the correct permissions
+//   => Super-effective with EC2 instance roles & ECS task roles
+```
+
+#### Facebook Profile Pictures
+
+```js
+const request = require('request');
+const wrender = require('wrender');
+
+module.exports = wrender.createOrigin('/fb/:profile_id', ({ profile_id }) => {
+  return request(`https://graph.facebook.com/${profile_id}/picture?width=1024&height=1024`);
+});
+
+// => /images/proxy/fb/113741208636938
+//   => https://graph.facebook.com/113741208636938/picture?width=1024&height=1024
+```
+
+This is also a good example for using custom origins to rewrite URLs.
+
+#### Lookup image data from a model
+
+```js
+const wrender = require('wrender');
+const AWS = require('aws-sdk');
+const images = require('../models/images');
+const s3 = new AWS.S3({ region, secretAccessKey, accessKeyId });
+
+module.exports = wrender.createOrigin('/users/:image_id', async ({ image_id }) => {
+  const { bucket, key } = await images.findById(image_id);
+  return s3.getObject({ Bucket: bucket, Key: key }).createReadStream();
+});
+
+// => /images/resize/200/200/users/9ff4a3cf5fe1a735ec96f142a2081f3e
+//   => s3://user-uploads.someimportantcompany.com/profiles/9ff4a3cf5fe1a735ec96f142a2081f3e.jpg
+```
+
+Hopefully, `images.findById` will be nicely cached or easy to pull up.
+
+#### Generate a Github-style Identicon
+
+```js
+const wrender = require('wrender');
+const stream = require('stream');
+const crypto = require('crypto');
+const Identicon = require('identicon.js');
+
+module.exports = wrender.createOrigin('/identicon/:token', async ({ token }) => {
+  const hash = crypto.createHash('sha256').update(token).digest('hex');
+
+  const options = {
+    // foreground: [ 40, 40, 45, 255 ],
+    saturation: 0.9,
+    brightness: 0.7,
+    background: [ 255, 255, 255, 255 ],
+    margin: 0.12,
+    size: 300,
+    format: 'png',
+  };
+
+  const base64image = new Identicon(hash, options).toString();
+
+  const bufferStream = new stream.PassThrough();
+  bufferStream.end(Buffer.from(base64image, 'base64'));
+  return bufferStream;
+});
+```
+
+## Docker
+
+```sh
+$ docker build -t g-wilson/wrender:dev .
+$ docker run -it -p 3010:3010 g-wilson/wrender:dev
+```
+
+## Roadmap
+
+- [x] Pluggable recipes
+- [x] Pluggable origins
+- [x] HTTP origin: Blacklist/whitelist
+- [x] HTTP orign: Redirects, basic auth
+- [x] HTTP origin: support for TLS requests
+- [x] Dockerfile
+- [ ] Integration tests
+- [ ] CI
+- [x] Origin: Private S3 buckets using IAM
+- [x] Recipe: Watermark/overlay
+- [x] Origin: Identicon

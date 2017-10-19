@@ -1,0 +1,12 @@
+env:
+  mocha: true
+plugins:
+  - mocha
+rules:
+  max-lines: off
+  mocha/no-exclusive-tests: error
+  mocha/no-identical-title: error
+  no-invalid-this: off
+  no-return-assign: off
+  no-undefined: off
+  wrap-iife: off

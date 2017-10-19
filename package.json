@@ -1,16 +1,13 @@
 {
   "name": "wrender",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "Image compression and transformation reverse-proxy for Express apps",
-  "main": "index.js",
-  "engines": {
-    "node": ">= 6.9.0"
-  },
+  "main": "src/index.js",
   "scripts": {
-    "pretest": "npm run test-artifacts-reset",
-    "posttest": "istanbul check-coverage",
-    "test": "istanbul cover _mocha -- tests/*.test.js tests/**/*.test.js",
-    "test-artifacts-reset": "rm -rf tests/artifacts && mkdir tests/artifacts"
+    "dev": "nodemon server.js",
+    "lint": "eslint .",
+    "test": "nyc mocha -- tests/*.test.js tests/**/*.test.js",
+    "start": "node server"
   },
   "keywords": [
     "image",
@@ -23,38 +20,57 @@
     "sharp",
     "libvips"
   ],
-  "author": "George Wilson <george@g-wilson.co.uk>",
+  "author": {
+    "name": "George Wilson",
+    "email": "george@g-wilson.co.uk"
+  },
+  "contributors": [
+    {
+      "name": "George Wilson",
+      "email": "george@g-wilson.co.uk"
+    },
+    {
+      "name": "James Dryden",
+      "email": "james@jdrydn.com"
+    }
+  ],
   "files": [
     "index.js",
-    "lib",
-    "recipes"
+    "src"
   ],
   "repository": {
     "type": "git",
     "url": "https://github.com/g-wilson/wrender.git"
   },
+  "bugs": {
+    "url": "https://github.com/Tallysticks/ts-backend/issues"
+  },
   "license": "MIT",
   "dependencies": {
-    "debug": "^2.6.0",
-    "express": "^4.14.0",
+    "express": "^4.16.2",
     "image-type": "^3.0.0",
-    "micromatch": "^2.3.11",
-    "path-to-regexp": "^1.7.0",
-    "read-chunk": "^2.0.0",
-    "request": "^2.79.0",
-    "sharp": "^0.17.1",
+    "micromatch": "^3.1.0",
+    "read-chunk": "^2.1.0",
+    "request": "^2.83.0",
+    "sharp": "^0.18.4",
     "temp": "^0.8.3"
   },
   "devDependencies": {
-    "image-size": "^0.5.1",
-    "istanbul": "^0.4.5",
-    "mocha": "^3.2.0",
-    "nock": "^9.0.2",
-    "serve-static": "^1.11.2",
+    "debug": "^3.1.0",
+    "eslint": "^4.8.0",
+    "eslint-plugin-mocha": "^4.11.0",
+    "image-size": "^0.6.1",
+    "mocha": "^4.0.1",
+    "morgan": "^1.9.0",
+    "nock": "^9.0.22",
+    "nodemon": "^1.12.1",
+    "nyc": "^11.2.1",
+    "restify": "^6.0.1",
+    "serve-static": "^1.13.1",
     "supertest": "^3.0.0"
   },
-  "engines" : {
-    "node" : "~6.9.4",
-    "npm" : "~3.10.9"
+  "engines": {
+    "node": "~8.6.0",
+    "npm": "~5.3.0"
   }
 }

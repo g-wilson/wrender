@@ -5,19 +5,19 @@ const size = require('image-size');
 describe('wrender', () => {
   describe('recipes', () => {
     describe('crop', () => {
-      const recipe = require('../../recipes/proxy');
+      const recipe = require('../../src/recipes/proxy');
 
-      it('should have the correct path', () => assert.equal(recipe.path, '/proxy/:source'));
+      it('should have the correct path', () => assert.equal(recipe.path, '/proxy/:origin'));
 
-      it('should crop an image', (done) => {
+      it('should compress an image', (done) => {
         images.run({
           recipe,
-          source: 'carthrottle.png',
-          dest: 'proxy-1.png',
+          source: 'pokedex.jpg',
+          dest: 'proxy-1.jpg',
         }, (err) => {
           if (err) return done(err);
 
-          assert.deepEqual(size(images.getArtifactsPath('proxy-1.png')), { type: 'png', height: 800, width: 800 });
+          assert.deepEqual(size(images.getArtifactsPath('proxy-1.jpg')), { type: 'jpg', height: 658, width: 800 });
           done();
         });
       });
