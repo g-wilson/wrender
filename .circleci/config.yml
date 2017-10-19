@@ -1,15 +1,14 @@
 version: 2
 defaults: &defaults
   environment:
-    TZ: /usr/share/zoneinfo/Europe/London
+    NODE_ENV: test
+    TZ: "/usr/share/zoneinfo/Atlantic/Reykjavik"
   working_directory: /home/circleci/wrender
 jobs:
   build:
     <<: *defaults
-    environment:
-      NODE_ENV: testing
     docker:
-      - image: circleci/node:8
+      - image: circleci/node:8.6.0
     steps:
       - checkout
       - restore_cache:
@@ -21,5 +20,9 @@ jobs:
           key: dependency-cache-{{ arch }}-{{ checksum "package-lock.json" }}
           paths:
             - ./node_modules
-      - run: npm run lint
-      # - run: npm test
+      - run:
+          name: Lint
+          command: npm run lint
+      - run:
+          name: Run tests
+          command: npm test
