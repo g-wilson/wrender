@@ -3,7 +3,7 @@
 [![NPM](https://badge.fury.io/js/wrender.svg)](https://www.npmjs.com/package/wrender)
 [![CircleCI](https://circleci.com/gh/g-wilson/wrender/tree/master.svg?style=shield)](https://circleci.com/gh/g-wilson/wrender)
 
-High-performance image compression and transformation reverse-proxy for Node.js web servers.
+High-performance image compression and transformation reverse-proxy for Node.js Express apps.
 
 ----
 
@@ -15,7 +15,7 @@ It is an open-source re-implementation of [Car Throttle](https://www.carthrottle
 
 The image processing is extremely fast and is handled by [Sharp](https://github.com/lovell/sharp), which implements the [libvips](https://github.com/jcupitt/libvips) library as a native module. As such, Node.js [Streams](https://nodejs.org/api/stream.html) are used to abstract the handling of image data.
 
-The recommended usage is part of a larger [express](https://expressjs.com)-based (or Restify!) application although a simple server is provided for example, testing and non-production environments. Rate-limiting, authentication, logging, and other such features are best implemented alongside with relevant packages and therefore are not provided here, although we do present a few examples to better demonstrate certain use-cases.
+The recommended usage is part of a larger [express](https://expressjs.com)-based application although a simple server is provided for example, testing and non-production environments. Rate-limiting, authentication, logging, and other such features are best implemented alongside with relevant packages and therefore are not provided here, although we do present a few examples to better demonstrate certain use-cases.
 
 ## Compression Defaults
 

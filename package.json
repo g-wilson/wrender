@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "dev": "nodemon server.js",
-    "lint": "eslint .",
+    "lint": "eslint src",
     "test": "nyc mocha -- tests/*.test.js tests/**/*.test.js",
     "start": "node server"
   },
