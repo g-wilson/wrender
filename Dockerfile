@@ -1,24 +1,23 @@
-FROM node:8
+FROM node:8.6.0-alpine
 MAINTAINER George Wilson <george@g-wilson.co.uk>
 
-# Fetch dumb-init
-ADD https://github.com/Yelp/dumb-init/releases/download/v1.1.1/dumb-init_1.1.1_amd64 /usr/local/bin/dumb-init
-RUN chmod +x /usr/local/bin/dumb-init
-ENTRYPOINT ["/usr/local/bin/dumb-init", "--"]
+# Install required build tools
+RUN apk update && apk upgrade
+RUN apk add --no-cache make gcc g++ python git openssh
+RUN apk add vips-dev fftw-dev --update-cache --repository https://dl-3.alpinelinux.org/alpine/edge/testing/
 
-RUN mkdir -p /var/app && chown node:node /var/app
-WORKDIR /var/app
+# Create application directory
+RUN mkdir -p /app
+WORKDIR /app
 
-COPY package*.json ./
-RUN npm install --production
+# Install packages
+COPY package.json /app/
+RUN npm install
 
-ARG NODE_ENV
-ENV NODE_ENV ${NODE_ENV:-development}
-RUN if [ "$NODE_ENV" != "production" ]; then npm install --only=dev; fi
-
-EXPOSE 3010
-
+# Copy application source code
 COPY . .
 
-USER node
-CMD [ "node", "server" ]
+# Expose ports
+EXPOSE 80
+
+CMD [ "npm", "start" ]
