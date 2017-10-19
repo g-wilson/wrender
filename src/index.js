@@ -69,7 +69,7 @@ function wrender(config = {}) {
     status: 404,
   })));
 
-  router.use(handleError);
+  router.use(handleError(config.onError));
 
   return router;
 }

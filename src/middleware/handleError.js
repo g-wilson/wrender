@@ -8,7 +8,10 @@ const errHeaders = {
 };
 
 // eslint-disable-next-line no-unused-vars
-module.exports = (err, req, res, next) => {
+module.exports = errorFn => (err, req, res, next) => {
   if (req.tempfile) fs.unlink(req.tempfile, () => {}); // eslint-disable-line no-empty-function
-  res.status(err.status || 500).set(errHeaders).set('X-Wrender-Error', `${err}`).send(errBlank);
+
+  res.status(err.status || 500).set(errHeaders).send(errBlank);
+
+  if (errorFn) errorFn(err);
 };
