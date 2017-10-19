@@ -11,10 +11,10 @@ module.exports = function handleProcessing(config, recipe) {
     let mimetype = type.mime;
 
     const source = fs.createReadStream(req.tempfile);
-    source.on('error', err => next(err));
-
     const image = sharp();
-    image.on('error', err => next(err));
+
+    source.on('error', err => next(err));
+    image.on('error', err => source.emit('error', err));
     image.on('finish', () => fs.unlink(req.tempfile, () => {})); // eslint-disable-line no-empty-function
 
     // Convert to JPEG? GIFs become still-frames
@@ -51,7 +51,7 @@ module.exports = function handleProcessing(config, recipe) {
     res.set('Content-Type', mimetype);
 
     // Go!
-    source.pipe(image);
     image.pipe(res);
+    source.pipe(image);
   };
 };
