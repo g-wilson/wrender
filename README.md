@@ -132,6 +132,9 @@ const instance = wrender({
   // Only allow specified UA
   userAgent: 'Amazon CloudFront',
 
+  // Add a callback if an error if encountered
+  onError: e => { console.error(e) },
+
   // You can specify your own recipes, or use the pre-defined ones, or both!
   // Skip this property to use the default recipes
   recipes: [
@@ -148,14 +151,15 @@ const instance = wrender({
   ],
 
   // If you want to use our recipes AND your own, that's easy to do too:
-  // recipes: Object.keys(wrender.recipes).map(k => wrender.recipes[k]).concat([
-  //   wrender.createRecipe('/tiny/:origin', image => {
-  //     wrender.invokeRecipe(wrender.recipes.resize, image, { width: 100, height: 100 });
-  //   }),
-  //   wrender.createRecipe('/huge/:origin', image => {
-  //     wrender.invokeRecipe(wrender.recipes.resize, image, { height: 1800, width: 2560 });
-  //   }),
-  // ]),
+  recipes: [
+    ...wrender.recipes,
+    wrender.createRecipe('/tiny/:origin', image => {
+      wrender.invokeRecipe(wrender.recipes.resize, image, { width: 100, height: 100 });
+    }),
+    wrender.createRecipe('/huge/:origin', image => {
+      wrender.invokeRecipe(wrender.recipes.resize, image, { height: 1800, width: 2560 });
+    }),
+  ]),
 
   // Specify how images can be fetched from the origin.
   origins: [
@@ -213,6 +217,12 @@ app.use('/images', instance);
  * - /images/crop/:width/:height/s3/:Bucket/:Key
  */
 ```
+
+## Error Handling
+
+If an error is caught inside wrender's route handler, a blank 1x1 PNG is served as a response along with an appropriate error code (usually 404 or perhaps 500).
+
+It is advised (but not required) to add a `onError` callback function to the constructor. This callback takes one argument (`error`) and is fired _after the response is sent_. You can use this callback to log errors wherever you like.
 
 ## Custom Recipes
 
@@ -305,15 +315,14 @@ app.use('/images', wrender({
 #### Private S3 Buckets
 
 ```js
+const wrender = require('wrender');
 const AWS = require('aws-sdk');
 
-const s3 = new AWS.S3({ region: 'us-east-1' });
+const s3 = new AWS.S3({ region, secretAccessKey, accessKeyId }); // Load these from environment variables
 
-app.use('/images', wrender({
-  origins: [
-    wrender.createOrigin('/s3/:Bucket/:Key(*)', ({ Bucket, Key }) => s3.getObject({ Bucket, Key }).createReadStream());
-  ],
-}));
+module.exports = wrender.createOrigin('/s3/:Bucket/:Key(*)', ({ Bucket, Key }) => {
+  return s3.getObject({ Bucket, Key }).createReadStream()
+});
 
 // => /images/proxy/s3/user-uploads.someimportantcompany.com/profiles/1505c30c51bb93545db48919b3cce7f9.jpg
 //   => Streams from S3, as long as the s3 instance has the correct permissions
@@ -323,15 +332,12 @@ app.use('/images', wrender({
 #### Facebook Profile Pictures
 
 ```js
-const request = require('request')
+const request = require('request');
+const wrender = require('wrender');
 
-app.use('/images', wrender({
-  origins: [
-    wrender.createOrigin('/fb/:profile_id', ({ profile_id }) => {
-      return request(`https://graph.facebook.com/${profile_id}/picture?width=1024&height=1024`);
-    }),
-  ],
-}));
+module.exports = wrender.createOrigin('/fb/:profile_id', ({ profile_id }) => {
+  return request(`https://graph.facebook.com/${profile_id}/picture?width=1024&height=1024`);
+});
 
 // => /images/proxy/fb/113741208636938
 //   => https://graph.facebook.com/113741208636938/picture?width=1024&height=1024
@@ -342,24 +348,50 @@ This is also a good example for using custom origins to rewrite URLs.
 #### Lookup image data from a model
 
 ```js
+const wrender = require('wrender');
 const AWS = require('aws-sdk');
 const images = require('../models/images');
-const s3 = new AWS.S3({ region: 'us-east-1' });
+const s3 = new AWS.S3({ region, secretAccessKey, accessKeyId });
 
-app.use('/images', wrender({
-  origins: [
-    wrender.createOrigin('/users/:image_id', async ({ image_id }) => {
-      const { bucket, key } = await images.findById(image_id);
-      return s3.getObject({ Bucket: bucket, Key: key }).createReadStream();
-    }),
-  ],
-}));
+module.exports = wrender.createOrigin('/users/:image_id', async ({ image_id }) => {
+  const { bucket, key } = await images.findById(image_id);
+  return s3.getObject({ Bucket: bucket, Key: key }).createReadStream();
+});
 
 // => /images/resize/200/200/users/9ff4a3cf5fe1a735ec96f142a2081f3e
 //   => s3://user-uploads.someimportantcompany.com/profiles/9ff4a3cf5fe1a735ec96f142a2081f3e.jpg
 ```
 
 Hopefully, `images.findById` will be nicely cached or easy to pull up.
+
+#### Generate a Github-style Identicon
+
+```js
+const wrender = require('wrender');
+const stream = require('stream');
+const crypto = require('crypto');
+const Identicon = require('identicon.js');
+
+module.exports = wrender.createOrigin('/identicon/:token', async ({ token }) => {
+  const hash = crypto.createHash('sha256').update(token).digest('hex');
+
+  const options = {
+    // foreground: [ 40, 40, 45, 255 ],
+    saturation: 0.9,
+    brightness: 0.7,
+    background: [ 255, 255, 255, 255 ],
+    margin: 0.12,
+    size: 300,
+    format: 'png',
+  };
+
+  const base64image = new Identicon(hash, options).toString();
+
+  const bufferStream = new stream.PassThrough();
+  bufferStream.end(Buffer.from(base64image, 'base64'));
+  return bufferStream;
+});
+```
 
 ## Docker
 
@@ -380,3 +412,4 @@ $ docker run -it -p 3010:3010 g-wilson/wrender:dev
 - [ ] CI
 - [x] Origin: Private S3 buckets using IAM
 - [x] Recipe: Watermark/overlay
+- [x] Origin: Identicon
