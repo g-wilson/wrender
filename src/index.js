@@ -34,6 +34,8 @@ function wrender(config = {}) {
     timeout: 10000,
   }, config || {});
 
+  if (config.userAgent && !Array.isArray(config.userAgent)) config.userAgent = [ config.userAgent ];
+
   let { recipes, origins } = config;
 
   const router = express.Router();
@@ -57,8 +59,8 @@ function wrender(config = {}) {
       }
 
       router.get(recipe.path.replace(recipesController.regex, origin.path), [
-        handleOrigin(config, origin),
-        handleRecipe(config, recipe),
+        handleOrigin(Object.assign({}, config), origin),
+        handleRecipe(Object.assign({}, config), recipe),
       ]);
     });
   });

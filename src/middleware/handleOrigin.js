@@ -3,8 +3,6 @@ const temp = require('temp');
 const errors = require('../lib/errors');
 
 module.exports = function handleSource(config, origin) {
-  if (config.userAgent || Array.isArray(config.userAgent)) config.userAgent = [ config.userAgent ];
-
   const tempOpts = {};
   if (config.tmpdir) tempOpts.dir = config.tmpdir;
 
