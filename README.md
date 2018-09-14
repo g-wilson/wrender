@@ -96,11 +96,38 @@ If you omit `origins` from the config object you supply to *wrender*, the defaul
   - The default path is `/:source`, which makes this origin act as a catch-all
   - **If you require a query string** then you must url-encode the entire `:source`, otherwise Express will strip the query string
 - **FS**
+  - Loads an image from the filesystem
   - Exposed at `wrender.origins.fs()`
   - Function taking opts
     - `prefix` - optionally add a prefix to the origin to avoid catch-all usage
     - `mount` - optionally define the start mount for the source, e.g. `/data`
   - The default path is `/:source`, which makes this origin act as a catch-all
+- **Identicon**
+  - Generates an image from the hash of an input token similar to GitHub
+  - Exposed at `wrender.origins.identicon()`
+  - URL params `/identicon/:token`
+    - `token` - input token which is hashed to generate the background colour (e.g. user id)
+  - Function taking opts
+    - `prefix` - optionally add a prefix to the origin to avoid catch-all usage (default 'identicon')
+    - `size` - size of the generated image (note: increasing this may impact memory usage). If `:size` or `:width` is used in the recipe params, the recipe params will overwrite the options here.
+    - `gridsize` - odd-numbered-integer to divide the image into pixels
+    - `saturation` - intensity of the foreground colour `[0, 1]`
+    - `lightness` - white/black level of the foreground colour `[0, 1]`
+    - `background` - rgb array for the background colour `[ r, g, b ] [0, 255]`
+    - `invert` - swaps the foreground and background colours (i.e. pixels are white on a coloured background)
+- **Initials**
+  - Generates an plain background colour with a text overlay
+  - Exposed at `wrender.origins.initials()`
+  - URL params `/initials/:token/:text`
+    - `token` - input token which is hashed to generate the background colour (e.g. user id)
+    - `text` - text to overlay (keep to 1 or 2 characters for best results)
+  - Function taking opts
+    - `prefix` - optionally add a prefix to the origin to avoid catch-all usage (default 'initials')
+    - `size` - size of the generated image (note: increasing this may impact memory usage). If `:size` or `:width` is used in the recipe params, the recipe params will overwrite the options here.
+    - `saturation` - intensity of the background colour `[0, 1]`
+    - `lightness` - white/black level of the background colour `[0, 1]`
+    - `color` - text colour (default 'white')
+    - `font` - font family for the test (default 'sans-serif')
 
 ## API
 
@@ -224,6 +251,8 @@ If an error is caught inside wrender's route handler, a blank 1x1 PNG is served 
 
 It is advised (but not required) to add a `onError` callback function to the constructor. This callback takes one argument (`error`) and is fired _after the response is sent_. You can use this callback to log errors wherever you like.
 
+-----
+
 ## Custom Recipes
 
 Custom recipes are designed to allow you complete customisation of how images are transformed before being served to the client, by using [the Sharp API](http://sharp.dimens.io/en/stable/api-operation).
@@ -267,6 +296,8 @@ wrender.createRecipe('/watermark/:origin', image => {
 ```
 
 Following [the overlayWith docs](http://sharp.dimens.io/en/stable/api-composite/#overlaywith), we can see how we would implement a watermark recipe.
+
+-----
 
 ## Custom Origins
 
@@ -364,34 +395,7 @@ module.exports = wrender.createOrigin('/users/:image_id', async ({ image_id }) =
 
 Hopefully, `images.findById` will be nicely cached or easy to pull up.
 
-#### Generate a Github-style Identicon
-
-```js
-const wrender = require('wrender');
-const stream = require('stream');
-const crypto = require('crypto');
-const Identicon = require('identicon.js');
-
-module.exports = wrender.createOrigin('/identicon/:token', async ({ token }) => {
-  const hash = crypto.createHash('sha256').update(token).digest('hex');
-
-  const options = {
-    // foreground: [ 40, 40, 45, 255 ],
-    saturation: 0.9,
-    brightness: 0.7,
-    background: [ 255, 255, 255, 255 ],
-    margin: 0.12,
-    size: 300,
-    format: 'png',
-  };
-
-  const base64image = new Identicon(hash, options).toString();
-
-  const bufferStream = new stream.PassThrough();
-  bufferStream.end(Buffer.from(base64image, 'base64'));
-  return bufferStream;
-});
-```
+-----
 
 ## Docker
 
@@ -399,17 +403,3 @@ module.exports = wrender.createOrigin('/identicon/:token', async ({ token }) => 
 $ docker build -t g-wilson/wrender:dev .
 $ docker run -it -p 3010:3010 g-wilson/wrender:dev
 ```
-
-## Roadmap
-
-- [x] Pluggable recipes
-- [x] Pluggable origins
-- [x] HTTP origin: Blacklist/whitelist
-- [x] HTTP orign: Redirects, basic auth
-- [x] HTTP origin: support for TLS requests
-- [x] Dockerfile
-- [ ] Integration tests
-- [ ] CI
-- [x] Origin: Private S3 buckets using IAM
-- [x] Recipe: Watermark/overlay
-- [x] Origin: Identicon

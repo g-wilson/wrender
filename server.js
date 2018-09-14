@@ -10,7 +10,19 @@ const server = http.createServer(app);
 app.get('/favicon.ico', (req, res) => res.sendStatus(204));
 app.use(require('morgan')('tiny'));
 
-app.use(wrender());
+app.use(wrender({
+  convertPNG: false,
+  onError: e => { console.error(e); }, // eslint-disable-line no-console
+  recipes: [
+    wrender.recipes.resize,
+    wrender.recipes.proxy,
+  ],
+  origins: [
+    wrender.origins.identicon({ invert: true }),
+    wrender.origins.initials(),
+    wrender.origins.http({ prefix: '/http' }),
+  ],
+}));
 
 server.on('error', err => {
   if (err.syscall === 'listen') switch (err.code) {

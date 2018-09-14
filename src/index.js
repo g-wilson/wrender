@@ -1,5 +1,5 @@
+const debug = require('debug')('wrender:server');
 const express = require('express');
-
 const errors = require('./lib/errors');
 const originsController = require('./lib/origin');
 const recipesController = require('./lib/recipe');
@@ -10,6 +10,8 @@ const handleError = require('./middleware/handleError');
 const builtinOrigins = {
   http: require('./origins/http'),
   fs: require('./origins/fs'),
+  identicon: require('./origins/identicon'),
+  initials: require('./origins/initials'),
 };
 
 const builtinRecipes = {
@@ -58,7 +60,11 @@ function wrender(config = {}) {
         throw new Error('Missing path/source from origin');
       }
 
-      router.get(recipe.path.replace(recipesController.regex, origin.path), [
+      const mountPath = recipe.path.replace(recipesController.regex, origin.path);
+
+      debug(`Adding route ${mountPath}`);
+
+      router.get(mountPath, [
         handleOrigin(Object.assign({}, config), origin),
         handleRecipe(Object.assign({}, config), recipe),
       ]);
