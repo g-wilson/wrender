@@ -264,7 +264,10 @@ wrender.createRecipe(path, handler)
 // Where `path` is a string defining the first part of the mount point, ending in /:origin
 // Where `handler` is a synchronous function, with the arguments (image, params)
 //   `image` is the Sharp instance, for you to instruct the transformation
-//   `params` is the req.params, which contain the variables in the route that you set with `path`
+//   `params` is the req.params, which contain the variables in the route that you set with `path`, plus...
+//   `params.query` is req.query
+//   `params.path` is req.path
+//   `params.originalUrl` is req.originalUrl
 ```
 
 ### Recipe examples
@@ -309,7 +312,10 @@ Origins are created using the `wrender.createOrigin` method with the following a
 wrender.createOrigin(path, handler)
 // Where `path` is a string defining the last part of the mount point
 // Where `handler` is a function, optionally async, with the arguments (params)
-//   `params` is the req.params, which contain the variables in the route that you set with `path`
+//   `params` is the req.params, which contain the variables in the route that you set with `path`, plus...
+//   `params.query` is req.query
+//   `params.path` is req.path
+//   `params.originalUrl` is req.originalUrl
 ```
 
 Ensure params in your origin paths are unique to your origin, as conflicting params with recipes will lead to unexpected behaviours. For example, a recipe with `/resize/:width/:height/:origin` and an origin with `/fb/:width/:profile_id` will lead to `/resize/:width/:height/fb/:width/:profile_id`. Not good!

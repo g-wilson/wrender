@@ -35,7 +35,11 @@ module.exports = function handleProcessing(config, recipe) {
     }
 
     // Apply recipe
-    recipe.process(image, req.params);
+    recipe.process(image, Object.assign(req.params, {
+      query: req.query,
+      path: req.path,
+      originalUrl: req.originalUrl,
+    }));
 
     // Always apply compression at the end
     if (mimetype === 'image/jpeg') {
