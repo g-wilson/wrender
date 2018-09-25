@@ -38,6 +38,11 @@ RUN cd /tmp/vips-${LIBVIPS_VERSION_MAJOR_MINOR}.${LIBVIPS_VERSION_PATCH} && \
 # Cleanup
 RUN rm -rf /tmp/vips-${LIBVIPS_VERSION_MAJOR_MINOR}.${LIBVIPS_VERSION_PATCH} && \
     rm -rf /var/cache/apk/*
+
+# Install fonts
+RUN apk add --no-cache ttf-freefont fontconfig font-noto
+RUN fc-cache -fv
+
 # Create application directory
 RUN mkdir -p /app
 WORKDIR /app
