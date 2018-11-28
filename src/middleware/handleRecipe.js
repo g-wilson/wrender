@@ -4,7 +4,11 @@ const imageType = require('image-type');
 const readChunk = require('read-chunk');
 const errors = require('../lib/errors');
 
-module.exports = function handleProcessing(config, recipe) {
+module.exports = function handleProcessing(defaultConfig, recipe) {
+
+  // Allows recipes to define overwrite the wrender instance config
+  const config = Object.freeze(Object.assign({}, defaultConfig, recipe.config));
+
   return (req, res, next) => {
     const type = imageType(readChunk.sync(req.tempfile, 0, 12)); // First 12 bytes contains the mime type header
     if (!type) return next(errors({ message: `Source file is not an image: ${req.originalUrl}`, status: 404 }));
@@ -35,11 +39,11 @@ module.exports = function handleProcessing(config, recipe) {
     }
 
     // Apply recipe
-    recipe.process(image, Object.assign(req.params, {
+    recipe.process(image, Object.freeze(Object.assign({}, req.params, {
       query: req.query,
       path: req.path,
       originalUrl: req.originalUrl,
-    }));
+    })));
 
     // Always apply compression at the end
     if (mimetype === 'image/jpeg') {

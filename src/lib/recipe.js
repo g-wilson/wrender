@@ -1,8 +1,8 @@
 const ORIGIN_REGEX = /\/:origin$/;
 
-class Recipe {
+class WrenderRecipe {
 
-  constructor (recipePath, processFn) {
+  constructor (recipePath, processFn, config = {}) {
     if (typeof recipePath !== 'string') {
       throw new Error('Expected path to be a string');
     }
@@ -15,20 +15,21 @@ class Recipe {
 
     Object.defineProperty(this, 'path', { enumerable: true, value: recipePath });
     Object.defineProperty(this, 'process', { enumerable: true, value: processFn });
+    Object.defineProperty(this, 'config', { enumerable: true, value: Object.freeze(config) });
   }
 
 }
 
 module.exports = {
 
-  createRecipe: (recipePath, processFn) => new Recipe(recipePath, processFn),
+  createRecipe: (recipePath, processFn, config) => new WrenderRecipe(recipePath, processFn, config),
 
   invokeRecipe(recipe, image, params) {
-    if (!(recipe instanceof Recipe)) throw new Error('Expected recipe to be an instance of Recipe');
+    if (!(recipe instanceof WrenderRecipe)) throw new Error('Expected recipe to be an instance of Recipe');
     recipe.process(image, params);
   },
 
-  instanceofRecipe: input => input instanceof Recipe,
+  instanceofRecipe: input => input instanceof WrenderRecipe,
 
   regex: ORIGIN_REGEX,
 

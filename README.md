@@ -260,7 +260,7 @@ Custom recipes are designed to allow you complete customisation of how images ar
 Recipes are created using the `wrender.createRecipe` method with the following arguments:
 
 ```js
-wrender.createRecipe(path, handler)
+wrender.createRecipe(path, handler, config)
 // Where `path` is a string defining the first part of the mount point, ending in /:origin
 // Where `handler` is a synchronous function, with the arguments (image, params)
 //   `image` is the Sharp instance, for you to instruct the transformation
@@ -268,6 +268,7 @@ wrender.createRecipe(path, handler)
 //   `params.query` is req.query
 //   `params.path` is req.path
 //   `params.originalUrl` is req.originalUrl
+// Where `config` is a plain object containing overrides to the Wrender instance config scoped to the this recipe only. Useful for customising quality or GIF conversion on a URL-basis.
 ```
 
 ### Recipe examples
