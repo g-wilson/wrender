@@ -49,10 +49,10 @@
   "dependencies": {
     "express": "^4.16.2",
     "image-type": "^3.0.0",
-    "micromatch": "^3.1.0",
+    "micromatch": "^3.1.10",
     "pnglib": "0.0.1",
     "read-chunk": "^2.1.0",
-    "request": "^2.83.0",
+    "request": "^2.88.0",
     "sharp": "^0.18.4",
     "temp": "^0.8.3"
   },
@@ -62,11 +62,10 @@
     "eslint-plugin-mocha": "^4.11.0",
     "image-size": "^0.6.1",
     "mocha": "^4.0.1",
-    "morgan": "^1.9.0",
+    "morgan": "^1.9.1",
     "nock": "^9.0.22",
-    "nodemon": "^1.12.1",
-    "nyc": "^11.2.1",
-    "restify": "^6.0.1",
+    "nodemon": "^1.18.7",
+    "nyc": "^13.1.0",
     "serve-static": "^1.13.1",
     "supertest": "^3.0.0"
   },
