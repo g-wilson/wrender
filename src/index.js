@@ -1,5 +1,6 @@
 const debug = require('debug')('wrender:server');
 const express = require('express');
+const sharp = require('sharp');
 const errors = require('./lib/errors');
 const originsController = require('./lib/origin');
 const recipesController = require('./lib/recipe');
@@ -91,5 +92,6 @@ wrender.createRecipe = recipesController.createRecipe;
 wrender.invokeRecipe = recipesController.invokeRecipe;
 wrender.recipes = builtinRecipes;
 wrender.origins = builtinOrigins;
+wrender.sharp = sharp;
 
 module.exports = wrender;
