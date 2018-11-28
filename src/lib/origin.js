@@ -1,4 +1,4 @@
-class Origin {
+class WrenderOrigin {
 
   constructor(originPath, fetchFn) {
     if (typeof originPath !== 'string') {
@@ -16,8 +16,8 @@ class Origin {
 
 module.exports = {
 
-  createOrigin: (originPath, fetchFn) => new Origin(originPath, fetchFn),
+  createOrigin: (originPath, fetchFn) => new WrenderOrigin(originPath, fetchFn),
 
-  instanceofOrigin: input => input instanceof Origin,
+  instanceofOrigin: input => input instanceof WrenderOrigin,
 
 };
