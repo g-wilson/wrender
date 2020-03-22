@@ -47,12 +47,12 @@
   },
   "license": "MIT",
   "dependencies": {
+    "axios": "^0.19.2",
     "express": "^4.16.2",
     "image-type": "^3.0.0",
     "micromatch": "^3.1.10",
     "pnglib": "0.0.1",
     "read-chunk": "^2.1.0",
-    "request": "^2.88.0",
     "sharp": "^0.19.0",
     "temp": "^0.8.3"
   },
