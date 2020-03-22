@@ -1,7 +1,7 @@
 # Wrender
 
 [![NPM](https://badge.fury.io/js/wrender.svg)](https://www.npmjs.com/package/wrender)
-[![CircleCI](https://circleci.com/gh/g-wilson/wrender/tree/master.svg?style=shield)](https://circleci.com/gh/g-wilson/wrender)
+[![CI](https://github.com/jdrydn/wrender/workflows/tests/badge.svg?event=push)](https://github.com/jdrydn/wrender/actions)
 
 High-performance image compression and transformation reverse-proxy for Node.js Express apps.
 
