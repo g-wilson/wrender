@@ -1,24 +1,19 @@
+const assert = require('http-assert');
 const fs = require('fs');
 const temp = require('temp');
-const errors = require('../lib/errors');
 
 module.exports = function handleSource(config, origin) {
-  const tempOpts = {};
-  if (config.tmpdir) tempOpts.dir = config.tmpdir;
-
   return (req, res, next) => {
-    if (config.userAgent && config.userAgent.indexOf(req.get('user-agent')) < 0) {
-      return next(errors({ message: 'User Agent forbidden', status: 403 }));
-    }
+    const { userAgent } = config;
+    assert(!userAgent || userAgent.includes(req.get('user-agent')), 403, new Error('User-Agent forbidden'));
 
-    if (config.maxWidth || config.maxHeight) {
-      if (req.params.width > config.maxWidth || req.params.height > config.maxHeight) {
-        return next(errors({ message: 'Requested image too large', status: 400 }));
-      }
-    }
+    const { maxHeight, maxWidth } = config;
+    const { height, width } = req.params;
+    assert((!maxHeight && !maxWidth) || ((height || 0) <= maxHeight && (width || 0) <= maxWidth),
+      400, new Error(`Requested image size is too large, should be no more than ${maxWidth}x${maxHeight}`));
 
     // Attach a temp path to the req
-    req.tempfile = temp.path(tempOpts);
+    req.tempfile = temp.path({ dir: config.tmpdir });
 
     // Create a write stream to a temp path
     const stream = fs.createWriteStream(req.tempfile);
