@@ -49,6 +49,7 @@
   "dependencies": {
     "axios": "^0.19.2",
     "express": "^4.16.2",
+    "http-assert": "^1.4.1",
     "image-type": "^3.0.0",
     "micromatch": "^3.1.10",
     "pnglib": "0.0.1",

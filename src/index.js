@@ -1,7 +1,7 @@
+const assert = require('http-assert');
 const debug = require('debug')('wrender:server');
 const express = require('express');
 const sharp = require('sharp');
-const errors = require('./lib/errors');
 const originsController = require('./lib/origin');
 const recipesController = require('./lib/recipe');
 const handleOrigin = require('./middleware/handleOrigin');
@@ -72,11 +72,10 @@ function wrender(config = {}) {
     });
   });
 
-  router.use((req, res, next) => next(errors({
-    err: new Error(`Missing route: ${req.originalUrl}`),
-    name: 'NotFoundError',
-    status: 404,
-  })));
+  router.use(req => assert(false, 404, new Error(`Missing route: ${req.originalUrl}`), {
+    code: 'ROUTE_NOT_FOUND',
+    url: req.originalUrl,
+  }));
 
   router.use(handleError(config.onError));
 

@@ -1,8 +1,8 @@
+const assert = require('http-assert');
 const fs = require('fs');
 const sharp = require('sharp');
 const imageType = require('image-type');
 const readChunk = require('read-chunk');
-const errors = require('../lib/errors');
 
 module.exports = function handleProcessing(defaultConfig, recipe) {
 
@@ -10,9 +10,8 @@ module.exports = function handleProcessing(defaultConfig, recipe) {
   const config = Object.freeze(Object.assign({}, defaultConfig, recipe.config));
 
   return (req, res, next) => {
-    const type = imageType(readChunk.sync(req.tempfile, 0, 12)); // First 12 bytes contains the mime type header
-    if (!type) return next(errors({ message: `Source file is not an image: ${req.originalUrl}`, status: 404 }));
-    let mimetype = type.mime;
+    let { mime: mimetype } = imageType(readChunk.sync(req.tempfile, 0, 12)); // First 12 bytes contains the mimetype
+    assert(`${mimetype}`.startsWith('image/'), 404, new Error(`Source file is not an image: ${req.originalUrl}`));
 
     const source = fs.createReadStream(req.tempfile);
     const image = sharp();
@@ -23,8 +22,8 @@ module.exports = function handleProcessing(defaultConfig, recipe) {
 
     // Convert to JPEG? GIFs become still-frames
     const convertToJPEG = (
-      (config.convertGIF && type.mime === 'image/gif') ||
-      (config.convertPNG && type.mime === 'image/png')
+      (config.convertGIF && mimetype === 'image/gif') ||
+      (config.convertPNG && mimetype === 'image/png')
     );
     if (mimetype !== 'image/jpeg' && convertToJPEG) {
       mimetype = 'image/jpeg';
