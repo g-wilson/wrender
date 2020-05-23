@@ -29,6 +29,7 @@ module.exports = function httpOrigin(opts) {
         // If we have a whitelist, and the hostname isn't within, or we have a blacklist and the hostname is within
         const isBlacklisted = (Array.isArray(whitelist) && whitelist.length && !micromatch.any(hostname, whitelist)) ||
           (Array.isArray(blacklist) && blacklist.length && micromatch.any(hostname, blacklist));
+
         if (isBlacklisted) {
           throw errors({
             err: new Error(`${source} is not a valid remote URL`),
@@ -53,12 +54,13 @@ module.exports = function httpOrigin(opts) {
         if (status === 200) {
           debug(`HTTP GET: ${source}: ${status} ${statusText}`, headers);
           return data;
-        } else {
-          const { location } = headers;
-          debug(`HTTP GET: ${source}: ${status} ${statusText} ${location}`);
-          source = location;
-          return request(i + 1);
         }
+
+        const { location } = headers;
+        debug(`HTTP GET: ${source}: ${status} ${statusText} ${location}`);
+        source = location;
+
+        return request(i + 1);
       } catch (err) {
         if (err.response) {
           const { status, statusText } = err.response || { status: 500, statusText: 'Internal Server Error' };
@@ -66,9 +68,9 @@ module.exports = function httpOrigin(opts) {
             err: new Error(`${status} ${statusText} response from ${source}`),
             status,
           });
-        } else {
-          throw err;
         }
+
+        throw err;
       }
     }));
 };
