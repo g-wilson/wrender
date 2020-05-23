@@ -14,6 +14,7 @@ module.exports = function handleProcessing(defaultConfig, recipe) {
     if (!type) return next(errors({ message: `Source file is not an image: ${req.originalUrl}`, status: 404 }));
     let mimetype = type.mime;
 
+    // prepare pipeline
     const source = fs.createReadStream(req.tempfile);
     const image = sharp();
 
@@ -38,28 +39,34 @@ module.exports = function handleProcessing(defaultConfig, recipe) {
       image.rotate();
     }
 
-    // Apply recipe
-    recipe.process(image, Object.freeze(Object.assign({}, req.params, {
+    // start pipeline
+    source.pipe(image);
+
+    const recipeInput =  Object.freeze(Object.assign({}, req.params, {
       query: req.query,
       path: req.path,
       originalUrl: req.originalUrl,
-    })));
+    }));
 
-    // Always apply compression at the end
-    if (mimetype === 'image/jpeg') {
-      image.jpeg({ quality: config.quality || 85 });
-    }
+    // Apply recipe
+    recipe.process(image, recipeInput).then(processedImg => {
 
-    // Discard EXIF
-    if (config.includeEXIF === true) {
-      image.withMetadata();
-    }
+      // Always apply compression at the end
+      if (mimetype === 'image/jpeg') {
+        processedImg.jpeg({ quality: config.quality || 85 });
+      }
 
-    res.set('Cache-Control', `public, max-age=${config.maxAge}`);
-    res.set('Content-Type', mimetype);
+      // Discard EXIF
+      if (config.includeEXIF === true) {
+        processedImg.withMetadata();
+      }
 
-    // Go!
-    image.pipe(res);
-    source.pipe(image);
+      res.set('Cache-Control', `public, max-age=${config.maxAge}`);
+      res.set('Content-Type', mimetype);
+
+      // Go!
+      processedImg.pipe(res);
+
+    }).catch(e => next(e));
   };
 };

@@ -57,6 +57,6 @@ module.exports = function initialsOrigin(opts) {
       },
     })
       .png()
-      .overlayWith(Buffer.from(svg));
+      .composite([ { input: Buffer.from(svg) } ]);
   });
 };

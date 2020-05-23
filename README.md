@@ -7,10 +7,6 @@ High-performance image compression and transformation reverse-proxy for Node.js 
 
 ----
 
-Use version 2.x.x for Node 10
-
-----
-
 This _library_ can be used to serve up compressed and transformed images from a high-resolution origin (e.g. Amazon S3) suitable for caching and delivery by a CDN.
 
 It provides features comparable to [Imgix](https://www.imgix.com/) and [Cloudinary](https://cloudinary.com/) for environments where you want much more customisation for how you source and handle your images. You will of course need your own CDN!
@@ -20,6 +16,20 @@ It is an open-source re-implementation of [Car Throttle](https://www.carthrottle
 The image processing is extremely fast and is handled by [Sharp](https://github.com/lovell/sharp), which implements the [libvips](https://github.com/jcupitt/libvips) library as a native module. As such, Node.js [Streams](https://nodejs.org/api/stream.html) are used to abstract the handling of image data.
 
 The recommended usage is part of a larger [express](https://expressjs.com)-based application although a simple server is provided for example, testing and non-production environments. Rate-limiting, authentication, logging, and other such features are best implemented alongside with relevant packages and therefore are not provided here, although we do present a few examples to better demonstrate certain use-cases.
+
+----
+
+Use version 3.x.x for Node 12+
+
+Use version 2.x.x for Node 10
+
+**Breaking changes:**
+
+- Recipe handler functions are treated as `async` functions, so they can now return a promise. This lets you use the Sharp [metadata api](https://sharp.pixelplumbing.com/api-input) inside recipes.
+
+- Recipe handler functions must return the Sharp `image` object for the pipeline to work.
+
+----
 
 ## Compression Defaults
 
@@ -175,9 +185,9 @@ const instance = wrender({
     wrender.recipes.crop,
 
     // Or you can attach custom recipes (see documentation below)
-    wrender.createRecipe('/mirror/:origin', image => {
-      wrender.invokeRecipe(wrender.recipes.resize, image, { width: 200, height: 200 });
-      image.flop();
+    wrender.createRecipe('/mirror/:origin', async image => {
+      const resized = await wrender.invokeRecipe(wrender.recipes.resize, image, { width: 200, height: 200 });
+      return resized.flop();
     }),
   ],
 
@@ -185,10 +195,10 @@ const instance = wrender({
   recipes: [
     ...wrender.recipes,
     wrender.createRecipe('/tiny/:origin', image => {
-      wrender.invokeRecipe(wrender.recipes.resize, image, { width: 100, height: 100 });
+      return wrender.invokeRecipe(wrender.recipes.resize, image, { width: 100, height: 100 });
     }),
     wrender.createRecipe('/huge/:origin', image => {
-      wrender.invokeRecipe(wrender.recipes.resize, image, { height: 1800, width: 2560 });
+      return wrender.invokeRecipe(wrender.recipes.resize, image, { height: 1800, width: 2560 });
     }),
   ]),
 
@@ -266,12 +276,14 @@ Recipes are created using the `wrender.createRecipe` method with the following a
 ```js
 wrender.createRecipe(path, handler, config)
 // Where `path` is a string defining the first part of the mount point, ending in /:origin
-// Where `handler` is a synchronous function, with the arguments (image, params)
+// Where `handler` is function, with the arguments (image, params)
 //   `image` is the Sharp instance, for you to instruct the transformation
 //   `params` is the req.params, which contain the variables in the route that you set with `path`, plus...
 //   `params.query` is req.query
 //   `params.path` is req.path
 //   `params.originalUrl` is req.originalUrl
+//   - it is always executed asynchronously (i.e. always treats the return value as a promise)
+//   - you *must* return the image (sharp object) at the end of the handler function
 // Where `config` is a plain object containing overrides to the Wrender instance config scoped to the this recipe only. Useful for customising quality or GIF conversion on a URL-basis.
 ```
 
@@ -280,13 +292,13 @@ wrender.createRecipe(path, handler, config)
 Asynchronous recipes are not supported. If you're looking to do an asynchronous operation with your recipe, consider using [the underlying `sharp` package](https://npm.im/sharp).
 
 ```js
-wrender.createRecipe('/mirror/:origin', image => {
-  wrender.invokeRecipe(wrender.recipes.resize, image, { width: 200, height: 200 });
-  image.flop();
+wrender.createRecipe('/mirror/:origin', async image => {
+  const resized = await wrender.invokeRecipe(wrender.recipes.resize, image, { width: 200, height: 200 });
+  return rezized.flop();
 })
 ```
 
-This recipe will resize the image using the built-in resize recipe, to 200x200, then flop the image about the horizontal X axis, as [discussed in the Sharp API operation docs](http://sharp.dimens.io/en/stable/api-operation/#flop).
+This recipe will resize the image using the built-in resize recipe, to 200x200, then flop the image about the horizontal X axis, as [discussed in the Sharp API operation docs](https://sharp.pixelplumbing.com/api-operation#flop).
 
 ```js
 wrender.createRecipe('/thumbnail/:source', image => wrender.invokeRecipe(wrender.recipes.resize, image, { width: 150 }))
@@ -297,13 +309,13 @@ By using `wrender.invokeRecipe(recipe, image, [params])` you can call existing r
 ```js
 const watermark = new Buffer('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', 'base64');
 
-wrender.createRecipe('/watermark/:origin', image => {
-  wrender.invokeRecipe(wrender.recipes.resize, image, { width: 200, height: 200 });
-  image.overlayWith(watermark, { gravity: 'northeast', top: 0 });
+wrender.createRecipe('/watermark/:origin', async image => {
+  const resized = await wrender.invokeRecipe(wrender.recipes.resize, image, { width: 200, height: 200 });
+  return resized.composite([ { input: watermark, gravity: 'northeast' });
 })
 ```
 
-Following [the overlayWith docs](http://sharp.dimens.io/en/stable/api-composite/#overlaywith), we can see how we would implement a watermark recipe.
+Following [the composite docs](https://sharp.pixelplumbing.com/api-composite), we can see how we would implement a watermark recipe.
 
 -----
 

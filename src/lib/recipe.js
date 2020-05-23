@@ -13,8 +13,14 @@ class WrenderRecipe {
       throw new Error(`Expected recipe path "${recipePath}" to end with "/:origin"`);
     }
 
+    /* eslint-disable require-await */
+    async function asyncProcessFn(...args) {
+      return processFn(...args);
+    }
+    /* eslint-enable require-await */
+
     Object.defineProperty(this, 'path', { enumerable: true, value: recipePath });
-    Object.defineProperty(this, 'process', { enumerable: true, value: processFn });
+    Object.defineProperty(this, 'process', { enumerable: true, value: asyncProcessFn });
     Object.defineProperty(this, 'config', { enumerable: true, value: Object.freeze(config) });
   }
 
@@ -26,7 +32,7 @@ module.exports = {
 
   invokeRecipe(recipe, image, params) {
     if (!(recipe instanceof WrenderRecipe)) throw new Error('Expected recipe to be an instance of Recipe');
-    recipe.process(image, params);
+    return recipe.process(image, params);
   },
 
   instanceofRecipe: input => input instanceof WrenderRecipe,

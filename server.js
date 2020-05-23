@@ -15,6 +15,7 @@ app.use(wrender({
   onError: e => { console.error(e); }, // eslint-disable-line no-console
   recipes: [
     wrender.recipes.resize,
+    wrender.recipes.crop,
     wrender.recipes.proxy,
   ],
   origins: [
