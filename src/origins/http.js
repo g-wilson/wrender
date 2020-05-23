@@ -1,55 +1,74 @@
+const axios = require('axios');
 const debug = require('debug')('wrender:origins');
+const errors = require('../lib/errors');
 const micromatch = require('micromatch');
-const request = require('request');
-const url = require('url');
-const promisify = require('../lib/promisify');
 const originController = require('../lib/origin');
+const url = require('url');
 
 module.exports = function httpOrigin(opts) {
   if (typeof opts === 'string') opts = { prefix: opts };
   opts = opts || {};
 
-  const req = opts.defaults ? request.defaults(opts.defaults) : request;
+  const req = opts.defaults ? axios.create(opts.defaults) : axios;
 
-  const filterable = (Array.isArray(opts.whitelist) && opts.whitelist.length) ||
-    (Array.isArray(opts.blacklist) && opts.blacklist.length);
-
-  if (!filterable) {
-    return originController.createOrigin(`${opts.prefix || ''}/:source(*)`, ({ source }) => {
-      debug(`HTTP GET: ${source}`);
-      return req(source);
-    });
-  }
-
-  return originController.createOrigin(`${opts.prefix || ''}/:source(*)`, async ({ source }) => {
-    await promisify(function makeRequest(callback) {
-      let isBlacklisted = false;
-
-      if (Array.isArray(opts.whitelist) && opts.whitelist.length) {
-        if (!micromatch.any(url.parse(source).hostname, opts.whitelist)) isBlacklisted = true;
-      }
-      if (Array.isArray(opts.blacklist) && opts.blacklist.length) {
-        if (micromatch.any(url.parse(source).hostname, opts.blacklist)) isBlacklisted = true;
+  return originController.createOrigin(`${opts.prefix || ''}/:source(*)`, ({ source }) => Promise.resolve()
+    .then(async function request(i = 0) {
+      // Mimic the maxRedirects option in Axios, and return an error if it's hit
+      if (opts.maxRedirects && i >= opts.maxRedirects) {
+        throw errors({
+          err: new Error('Too many redirects'),
+          code: 'HTTP_MAX_REDIRECTED',
+          status: 429,
+        });
       }
 
-      if (isBlacklisted) return Promise.reject(new Error(`${source} is not a valid remote URL`));
+      if (Array.isArray(opts.whitelist) || Array.isArray(opts.blacklist)) {
+        const { whitelist, blacklist } = opts;
+        const { hostname } = url.parse(source);
 
-      debug(`HTTP HEAD: ${source}`);
-      request.head(source, (err, res) => {
-        if (err) {
-          callback(err);
-        } else if (res.statusCode >= 301 && res.statusCode <= 303 && res.headers.location) {
-          source = res.headers.location;
-          makeRequest(callback);
-        } else if (res.statusCode !== 200 && res.statusCode !== 304) {
-          callback(new Error(`${res.statusCode} response from ${source}`));
-        } else {
-          callback();
+        // If we have a whitelist, and the hostname isn't within, or we have a blacklist and the hostname is within
+        const isBlacklisted = (Array.isArray(whitelist) && whitelist.length && !micromatch.any(hostname, whitelist)) ||
+          (Array.isArray(blacklist) && blacklist.length && micromatch.any(hostname, blacklist));
+        if (isBlacklisted) {
+          throw errors({
+            err: new Error(`${source} is not a valid remote URL`),
+            code: 'HTTP_BLACKLISTED_URL',
+            status: 422,
+          });
         }
-      });
-    });
+      }
 
-    debug(`HTTP GET: ${source}`);
-    return req(source);
-  });
+      debug(`HTTP GET: ${source}`);
+
+      try {
+        const { status, statusText, headers, data } = await req.get(source, {
+          // Force no redirects, so we can check if the source is blacklisted/whitelisted ourselves
+          maxRedirects: 0,
+          // Always force a stream response
+          responseType: 'stream',
+          // Only allow an OK status or a redirect status
+          validateStatus: s => s === 200 || (s > 300 && s < 400),
+        });
+
+        if (status === 200) {
+          debug(`HTTP GET: ${source}: ${status} ${statusText}`, headers);
+          return data;
+        } else {
+          const { location } = headers;
+          debug(`HTTP GET: ${source}: ${status} ${statusText} ${location}`);
+          source = location;
+          return request(i + 1);
+        }
+      } catch (err) {
+        if (err.response) {
+          const { status, statusText } = err.response || { status: 500, statusText: 'Internal Server Error' };
+          throw errors({
+            err: new Error(`${status} ${statusText} response from ${source}`),
+            status,
+          });
+        } else {
+          throw err;
+        }
+      }
+    }));
 };
