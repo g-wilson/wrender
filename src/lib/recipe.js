@@ -39,4 +39,6 @@ module.exports = {
 
   regex: ORIGIN_REGEX,
 
+  WrenderRecipe: WrenderRecipe,
+
 };
